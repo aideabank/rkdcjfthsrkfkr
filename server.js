@@ -130,7 +130,7 @@ io.on('connection', (socket) => {
                 if (!userGuess) return;
                 let delta = Infinity;
                 if (currentTopic.type === '평균' || currentTopic.type === '중앙값') {
-                    const parsedGuess = parseFloat(userGuess);
+                    const parsedGuess = parseFloat(stripUnit(userGuess, currentTopic.type));
                     if (!isNaN(parsedGuess)) delta = Math.abs(answerSheet.raw - parsedGuess);
                 } else if (currentTopic.type === '최빈값') {
                     delta = answerSheet.raw.includes(String(userGuess).trim().toUpperCase()) ? 0 : 1;
@@ -160,15 +160,20 @@ io.on('connection', (socket) => {
     });
 });
 
+function stripUnit(value, topicType) {
+    if (topicType === '최빈값') return value;
+    return String(value).replace(/[^0-9.\-]/g, '');
+}
+
 function calculateServerStats(students, topic) {
     const rawList = Object.values(students).map(s => s.realData ? s.realData[topic.id] : null).filter(v => v !== undefined && v !== null && v !== '');
     if (rawList.length === 0) return { raw: null };
     if (topic.type === '평균') {
-        const numbers = rawList.map(v => parseFloat(v)).filter(v => !isNaN(v));
+        const numbers = rawList.map(v => parseFloat(stripUnit(v, '평균'))).filter(v => !isNaN(v));
         if (numbers.length === 0) return { raw: null };
         return { raw: numbers.reduce((a, b) => a + b, 0) / numbers.length };
     } else if (topic.type === '중앙값') {
-        const numbers = rawList.map(v => parseFloat(v)).filter(v => !isNaN(v));
+        const numbers = rawList.map(v => parseFloat(stripUnit(v, '중앙값'))).filter(v => !isNaN(v));
         if (numbers.length === 0) return { raw: null };
         numbers.sort((a, b) => a - b);
         const mid = Math.floor(numbers.length / 2);

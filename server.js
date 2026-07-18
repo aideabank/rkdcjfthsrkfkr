@@ -37,7 +37,7 @@ io.on('connection', (socket) => {
     socket.on('join_room', ({ classId }) => {
         socket.join(classId);
         if (!classes[classId]) {
-            classes[classId] = { className: `${classId}반`, students: {}, currentRound: { active: false, topicId: null, revealed: false, usedIds: [] } };
+            classes[classId] = { className: classId, students: {}, currentRound: { active: false, topicId: null, revealed: false, usedIds: [] } };
         }
         const allClassIds = Object.keys(classes).map(id => ({
             id,
@@ -47,9 +47,16 @@ io.on('connection', (socket) => {
         socket.emit('init_state', { globalTopics, classData: classes[classId], selectedClassId: classId, allClassIds });
     });
 
-    socket.on('create_class', ({ classId }) => {
+    socket.on('create_class', ({ classId, className }) => {
         if (!classes[classId]) {
-            classes[classId] = { className: `${classId}반`, students: {}, currentRound: { active: false, topicId: null, revealed: false, usedIds: [] } };
+            classes[classId] = { className: className || classId, students: {}, currentRound: { active: false, topicId: null, revealed: false, usedIds: [] } };
+            io.emit('refresh_global');
+        }
+    });
+
+    socket.on('delete_class', ({ classId }) => {
+        if (classes[classId]) {
+            delete classes[classId];
             io.emit('refresh_global');
         }
     });

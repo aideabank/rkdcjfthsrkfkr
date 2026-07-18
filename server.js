@@ -103,7 +103,7 @@ io.on('connection', (socket) => {
         const targetTopicId = availableTopics[Math.floor(Math.random() * availableTopics.length)].id;
 
         io.to(classId).emit('roulette_spin_start', {
-            allTopics: globalTopics.map(t => ({ id: t.id, title: t.title, type: t.type })),
+            allTopics: availableTopics.map(t => ({ id: t.id, title: t.title, type: t.type })),
             targetTopicId,
             duration: 5000
         });

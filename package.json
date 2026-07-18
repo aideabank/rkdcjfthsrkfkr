@@ -1,0 +1,14 @@
+{
+  "name": "stats-game-server",
+  "version": "1.0.0",
+  "description": "대푯값 통계 게임 실시간 백엔드 서버",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5",
+    "cors": "^2.8.5"
+  }
+}

@@ -67,6 +67,14 @@ io.on('connection', (socket) => {
         io.emit('refresh_global');
     });
 
+    socket.on('delete_global_topic', ({ topicId }) => {
+        globalTopics = globalTopics.filter(t => t.id !== topicId);
+        Object.values(classes).forEach(cls => {
+            cls.currentRound.usedIds = cls.currentRound.usedIds.filter(id => id !== topicId);
+        });
+        io.emit('refresh_global');
+    });
+
     socket.on('student_login', ({ classId, number, name }) => {
         const currentClass = classes[classId];
         if (!currentClass) return;

@@ -93,18 +93,32 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('trigger_roulette', ({ classId, targetTopicId }) => {
+    socket.on('trigger_roulette', ({ classId }) => {
         const currentClass = classes[classId];
         if (!currentClass) return;
-        currentClass.currentRound.active = true;
-        currentClass.currentRound.revealed = false;
-        currentClass.currentRound.topicId = targetTopicId;
-        currentClass.currentRound.usedIds.push(targetTopicId);
-        Object.keys(currentClass.students).forEach(sid => {
-            currentClass.students[sid].guessData = currentClass.students[sid].guessData || {};
-            currentClass.students[sid].guessData[targetTopicId] = '';
+
+        const availableTopics = globalTopics.filter(t => !currentClass.currentRound.usedIds.includes(t.id));
+        if (availableTopics.length === 0) return;
+
+        const targetTopicId = availableTopics[Math.floor(Math.random() * availableTopics.length)].id;
+
+        io.to(classId).emit('roulette_spin_start', {
+            allTopics: globalTopics.map(t => ({ id: t.id, title: t.title, type: t.type })),
+            targetTopicId,
+            duration: 5000
         });
-        io.to(classId).emit('roulette_start_signal', { targetTopicId, classData: currentClass });
+
+        setTimeout(() => {
+            currentClass.currentRound.active = true;
+            currentClass.currentRound.revealed = false;
+            currentClass.currentRound.topicId = targetTopicId;
+            currentClass.currentRound.usedIds.push(targetTopicId);
+            Object.keys(currentClass.students).forEach(sid => {
+                currentClass.students[sid].guessData = currentClass.students[sid].guessData || {};
+                currentClass.students[sid].guessData[targetTopicId] = '';
+            });
+            io.to(classId).emit('roulette_start_signal', { targetTopicId, classData: currentClass });
+        }, 5200);
     });
 
     socket.on('student_submit_guess', ({ classId, stuId, topicId, guessValue }) => {

@@ -39,7 +39,12 @@ io.on('connection', (socket) => {
         if (!classes[classId]) {
             classes[classId] = { className: `${classId}반`, students: {}, currentRound: { active: false, topicId: null, revealed: false, usedIds: [] } };
         }
-        socket.emit('init_state', { globalTopics, classData: classes[classId], selectedClassId: classId });
+        const allClassIds = Object.keys(classes).map(id => ({
+            id,
+            className: classes[id].className,
+            studentCount: Object.keys(classes[id].students).length
+        }));
+        socket.emit('init_state', { globalTopics, classData: classes[classId], selectedClassId: classId, allClassIds });
     });
 
     socket.on('create_class', ({ classId }) => {

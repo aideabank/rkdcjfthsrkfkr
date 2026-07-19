@@ -161,6 +161,14 @@ io.on('connection', (socket) => {
         io.to(classId).emit('answer_revealed_signal', currentClass);
     });
 
+    socket.on('reset_class', ({ classId }) => {
+        if (classes[classId]) {
+            classes[classId].students = {};
+            classes[classId].currentRound = { active: false, topicId: null, revealed: false, usedIds: [] };
+            io.to(classId).emit('refresh_global');
+        }
+    });
+
     socket.on('reset_all_server', () => {
         classes = {
             '3-1': { className: '3학년 1반', students: {}, currentRound: { active: false, topicId: null, revealed: false, usedIds: [] } },

@@ -1,11 +1,20 @@
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
 const cors = require('cors');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const clientDirectory = process.env.CLIENT_DIR
+    ? path.resolve(process.env.CLIENT_DIR)
+    : null;
+
+if (clientDirectory) {
+    app.use(express.static(clientDirectory));
+}
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -27,47 +36,103 @@ let classes = {
     '3-2': { className: '3학년 2반', students: {}, currentRound: { active: false, topicId: null, revealed: false, usedIds: [] } }
 };
 
+const TEACHER_PIN = String(process.env.TEACHER_PIN || '').trim();
+const TOPIC_TYPES = new Set(['평균', '중앙값', '최빈값']);
+
+function sanitizeText(value, maxLength) {
+    return String(value ?? '')
+        .replace(/[<>&"'`]/g, '')
+        .trim()
+        .slice(0, maxLength);
+}
+
+function reject(socket, code, message) {
+    socket.emit('server_error', { code, message });
+    return false;
+}
+
+function requireTeacher(socket, payload) {
+    if (!TEACHER_PIN) return true;
+    if (String(payload?.teacherPin ?? '') === TEACHER_PIN) return true;
+    return reject(socket, 'UNAUTHORIZED', '교사용 PIN이 올바르지 않습니다.');
+}
+
+function sanitizeSubmission(data) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+    const result = {};
+    globalTopics.forEach(topic => {
+        if (Object.prototype.hasOwnProperty.call(data, topic.id)) {
+            result[topic.id] = sanitizeText(data[topic.id], 60);
+        }
+    });
+    return result;
+}
+
 app.get('/', (req, res) => {
     res.send('📊 대푯값 통계 게임 실시간 보안 백엔드 서버 정상 구동 중!');
+});
+
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', service: 'stats-game-server' });
 });
 
 io.on('connection', (socket) => {
     console.log('🔗 새로운 단말기 연결:', socket.id);
 
-    socket.on('join_room', ({ classId }) => {
+    socket.on('join_room', (payload = {}) => {
+        const classId = sanitizeText(payload.classId, 30);
+        if (!classId) return reject(socket, 'INVALID_CLASS', '올바른 반을 선택하세요.');
+        if (!classes[classId]) return reject(socket, 'INVALID_CLASS', '존재하지 않는 반입니다.');
         socket.join(classId);
-        if (!classes[classId]) {
-            classes[classId] = { className: classId, students: {}, currentRound: { active: false, topicId: null, revealed: false, usedIds: [] } };
-        }
         const allClassIds = Object.keys(classes).map(id => ({
             id,
             className: classes[id].className,
             studentCount: Object.keys(classes[id].students).length
         }));
-        socket.emit('init_state', { globalTopics, classData: classes[classId], selectedClassId: classId, allClassIds });
+        socket.emit('init_state', {
+            globalTopics,
+            classData: classes[classId],
+            selectedClassId: classId,
+            allClassIds,
+            teacherAuthRequired: Boolean(TEACHER_PIN)
+        });
     });
 
-    socket.on('create_class', ({ classId, className }) => {
+    socket.on('create_class', (payload = {}) => {
+        if (!requireTeacher(socket, payload)) return;
+        const classId = sanitizeText(payload.classId, 30);
+        const className = sanitizeText(payload.className, 30) || classId;
+        if (!classId) return reject(socket, 'INVALID_CLASS', '반 이름을 입력하세요.');
         if (!classes[classId]) {
-            classes[classId] = { className: className || classId, students: {}, currentRound: { active: false, topicId: null, revealed: false, usedIds: [] } };
+            classes[classId] = { className, students: {}, currentRound: { active: false, topicId: null, revealed: false, usedIds: [] } };
             io.emit('refresh_global');
         }
     });
 
-    socket.on('delete_class', ({ classId }) => {
+    socket.on('delete_class', (payload = {}) => {
+        if (!requireTeacher(socket, payload)) return;
+        const classId = sanitizeText(payload.classId, 30);
         if (classes[classId]) {
             delete classes[classId];
             io.emit('refresh_global');
         }
     });
 
-    socket.on('add_global_topic', ({ title, type }) => {
+    socket.on('add_global_topic', (payload = {}) => {
+        if (!requireTeacher(socket, payload)) return;
+        const title = sanitizeText(payload.title, 100);
+        const type = sanitizeText(payload.type, 10);
+        if (!title || !TOPIC_TYPES.has(type)) {
+            return reject(socket, 'INVALID_TOPIC', '주제와 대푯값 유형을 확인하세요.');
+        }
         const newTopic = { id: 'gt_' + Date.now(), title, type };
         globalTopics.push(newTopic);
         io.emit('refresh_global');
     });
 
-    socket.on('delete_global_topic', ({ topicId }) => {
+    socket.on('delete_global_topic', (payload = {}) => {
+        if (!requireTeacher(socket, payload)) return;
+        const topicId = sanitizeText(payload.topicId, 64);
         globalTopics = globalTopics.filter(t => t.id !== topicId);
         Object.values(classes).forEach(cls => {
             cls.currentRound.usedIds = cls.currentRound.usedIds.filter(id => id !== topicId);
@@ -75,30 +140,47 @@ io.on('connection', (socket) => {
         io.emit('refresh_global');
     });
 
-    socket.on('student_login', ({ classId, number, name }) => {
+    socket.on('student_login', (payload = {}) => {
+        const classId = sanitizeText(payload.classId, 30);
+        const number = Number(payload.number);
+        const name = sanitizeText(payload.name, 20);
+        if (!classes[classId] || !Number.isInteger(number) || number < 1 || number > 40 || !name) {
+            return reject(socket, 'INVALID_STUDENT', '반, 번호(1~40), 이름을 확인하세요.');
+        }
         const currentClass = classes[classId];
-        if (!currentClass) return;
         const stuId = 'id_' + number;
         if (!currentClass.students[stuId]) {
             currentClass.students[stuId] = { id: stuId, number, name, realData: {}, guessData: {}, score: 0 };
+        } else {
+            currentClass.students[stuId].name = name;
         }
         io.to(classId).emit('class_data_update', currentClass);
     });
 
-    socket.on('student_submit_realdata', ({ classId, stuId, realData }) => {
+    socket.on('student_submit_realdata', (payload = {}) => {
+        const classId = sanitizeText(payload.classId, 30);
+        const stuId = sanitizeText(payload.stuId, 20);
+        const realData = sanitizeSubmission(payload.realData);
         const currentClass = classes[classId];
+        if (!currentClass || !currentClass.students[stuId] || !realData) {
+            return reject(socket, 'INVALID_SUBMISSION', '학생 정보와 제출 데이터를 확인하세요.');
+        }
         if (currentClass && currentClass.students[stuId]) {
             currentClass.students[stuId].realData = realData;
             io.to(classId).emit('class_data_update', currentClass);
         }
     });
 
-    socket.on('trigger_roulette', ({ classId }) => {
+    socket.on('trigger_roulette', (payload = {}) => {
+        if (!requireTeacher(socket, payload)) return;
+        const classId = sanitizeText(payload.classId, 30);
         const currentClass = classes[classId];
-        if (!currentClass) return;
+        if (!currentClass) return reject(socket, 'INVALID_CLASS', '존재하지 않는 반입니다.');
 
         const availableTopics = globalTopics.filter(t => !currentClass.currentRound.usedIds.includes(t.id));
-        if (availableTopics.length === 0) return;
+        if (availableTopics.length === 0) {
+            return reject(socket, 'NO_TOPIC', '사용 가능한 주제가 없습니다.');
+        }
 
         const targetTopicId = availableTopics[Math.floor(Math.random() * availableTopics.length)].id;
 
@@ -121,8 +203,18 @@ io.on('connection', (socket) => {
         }, 5200);
     });
 
-    socket.on('student_submit_guess', ({ classId, stuId, topicId, guessValue }) => {
+    socket.on('student_submit_guess', (payload = {}) => {
+        const classId = sanitizeText(payload.classId, 30);
+        const stuId = sanitizeText(payload.stuId, 20);
+        const topicId = sanitizeText(payload.topicId, 64);
+        const guessValue = sanitizeText(payload.guessValue, 60);
         const currentClass = classes[classId];
+        if (!currentClass || !currentClass.students[stuId]
+            || !currentClass.currentRound.active
+            || currentClass.currentRound.topicId !== topicId
+            || !guessValue) {
+            return reject(socket, 'INVALID_GUESS', '현재 문제의 예측값을 확인하세요.');
+        }
         if (currentClass && currentClass.students[stuId]) {
             currentClass.students[stuId].guessData = currentClass.students[stuId].guessData || {};
             currentClass.students[stuId].guessData[topicId] = guessValue;
@@ -130,9 +222,13 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('reveal_answer', ({ classId }) => {
+    socket.on('reveal_answer', (payload = {}) => {
+        if (!requireTeacher(socket, payload)) return;
+        const classId = sanitizeText(payload.classId, 30);
         const currentClass = classes[classId];
-        if (!currentClass || !currentClass.currentRound.topicId) return;
+        if (!currentClass || !currentClass.currentRound.topicId) {
+            return reject(socket, 'NO_ACTIVE_ROUND', '진행 중인 문제가 없습니다.');
+        }
         currentClass.currentRound.revealed = true;
         const currentTopic = globalTopics.find(t => t.id === currentClass.currentRound.topicId);
         const answerSheet = calculateServerStats(currentClass.students, currentTopic);
@@ -161,7 +257,9 @@ io.on('connection', (socket) => {
         io.to(classId).emit('answer_revealed_signal', currentClass);
     });
 
-    socket.on('reset_class', ({ classId }) => {
+    socket.on('reset_class', (payload = {}) => {
+        if (!requireTeacher(socket, payload)) return;
+        const classId = sanitizeText(payload.classId, 30);
         if (classes[classId]) {
             classes[classId].students = {};
             classes[classId].currentRound = { active: false, topicId: null, revealed: false, usedIds: [] };
@@ -169,7 +267,8 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('reset_all_server', () => {
+    socket.on('reset_all_server', (payload = {}) => {
+        if (!requireTeacher(socket, payload)) return;
         classes = {
             '3-1': { className: '3학년 1반', students: {}, currentRound: { active: false, topicId: null, revealed: false, usedIds: [] } },
             '3-2': { className: '3학년 2반', students: {}, currentRound: { active: false, topicId: null, revealed: false, usedIds: [] } }

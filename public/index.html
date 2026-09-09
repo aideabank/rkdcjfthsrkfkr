@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>우리반의 대푯값을 찾아라! - 학생용</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --pastel-pink: #FFB6C1;
+            --pastel-blue: #B0E0E6;
+            --pastel-green: #B5EAD7;
+            --pastel-purple: #D4B5FF;
+            --pastel-yellow: #FFF9B0;
+            --pastel-orange: #FFDAB9;
+            --bg-gradient: linear-gradient(135deg, #E8F5FF 0%, #FFF0F5 50%, #F0FFF0 100%);
+            --card-bg: rgba(255, 255, 255, 0.85);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            --radius: 20px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            padding: 30px 0 20px;
+        }
+
+        .header h1 {
+            font-size: 1.8em;
+            font-weight: 700;
+            background: linear-gradient(135deg, #FF6B9D, #C084FC, #60A5FA);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #888;
+            font-size: 0.95em;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border-radius: var(--radius);
+            padding: 28px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+        }
+
+        .card-title {
+            font-size: 1.1em;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title .icon {
+            font-size: 1.3em;
+        }
+
+        .form-group {
+            margin-bottom: 14px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.9em;
+            font-weight: 500;
+            color: #555;
+            margin-bottom: 6px;
+        }
+
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #E8E8E8;
+            border-radius: 12px;
+            font-size: 1em;
+            font-family: 'Noto Sans KR', sans-serif;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .form-group select:focus,
+        .form-group input:focus {
+            outline: none;
+            border-color: #C084FC;
+            box-shadow: 0 0 0 4px rgba(192, 132, 252, 0.15);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.05em;
+            font-weight: 700;
+            font-family: 'Noto Sans KR', sans-serif;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:active {
+            transform: scale(0.97);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #C084FC, #818CF8);
+            color: white;
+            box-shadow: 0 4px 15px rgba(192, 132, 252, 0.4);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 6px 20px rgba(192, 132, 252, 0.5);
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #6DD5B0, #34D399);
+            color: white;
+            box-shadow: 0 4px 15px rgba(52, 211, 153, 0.4);
+        }
+
+        .btn-success:disabled {
+            background: #ccc;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border-radius: 12px;
+            font-size: 0.9em;
+            font-weight: 500;
+            margin-bottom: 16px;
+        }
+
+        .status-bar.connected {
+            background: rgba(181, 234, 215, 0.5);
+            color: #059669;
+        }
+
+        .status-bar.disconnected {
+            background: rgba(255, 182, 193, 0.5);
+            color: #DC143C;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .connected .status-dot { background: #34D399; }
+        .disconnected .status-dot { background: #DC143C; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 18px;
+            background: linear-gradient(135deg, rgba(255, 182, 193, 0.3), rgba(176, 224, 230, 0.3));
+            border-radius: 14px;
+            margin-bottom: 16px;
+        }
+
+        .user-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--pastel-purple), var(--pastel-blue));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3em;
+            font-weight: 700;
+            color: white;
+        }
+
+        .user-info {
+            flex: 1;
+        }
+
+        .user-info .name {
+            font-weight: 700;
+            font-size: 1.05em;
+        }
+
+        .user-info .detail {
+            font-size: 0.85em;
+            color: #888;
+        }
+
+        .score-badge {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 1em;
+        }
+
+        .topic-display {
+            text-align: center;
+            padding: 24px;
+            background: linear-gradient(135deg, rgba(212, 181, 255, 0.3), rgba(255, 182, 193, 0.3));
+            border-radius: 16px;
+            margin-bottom: 16px;
+        }
+
+        .topic-display .topic-label {
+            font-size: 0.85em;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        .topic-display .topic-title {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #333;
+            line-height: 1.4;
+        }
+
+        .topic-display .topic-type {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 700;
+        }
+
+        .type-avg { background: var(--pastel-blue); color: #0369A1; }
+        .type-median { background: var(--pastel-green); color: #059669; }
+        .type-mode { background: var(--pastel-orange); color: #C2410C; }
+
+        .input-area {
+            position: relative;
+        }
+
+        .input-area input {
+            width: 100%;
+            padding: 16px 20px;
+            border: 3px solid #E8E8E8;
+            border-radius: 16px;
+            font-size: 1.2em;
+            font-weight: 500;
+            text-align: center;
+            font-family: 'Noto Sans KR', sans-serif;
+            transition: all 0.3s ease;
+        }
+
+        .input-area input:focus {
+            outline: none;
+            border-color: #C084FC;
+            box-shadow: 0 0 0 4px rgba(192, 132, 252, 0.15);
+        }
+
+        .input-hint {
+            text-align: center;
+            font-size: 0.85em;
+            color: #999;
+            margin-top: 8px;
+        }
+
+        .waiting-animation {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .waiting-animation .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #E8E8E8;
+            border-top-color: #C084FC;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .waiting-animation p {
+            color: #888;
+            font-size: 0.95em;
+        }
+
+        .result-card {
+            text-align: center;
+            padding: 30px;
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 165, 0, 0.15));
+            border-radius: 16px;
+            border: 2px solid rgba(255, 215, 0, 0.3);
+        }
+
+        .result-card .answer-label {
+            font-size: 0.9em;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        .result-card .answer-value {
+            font-size: 2.2em;
+            font-weight: 700;
+            background: linear-gradient(135deg, #FF6B9D, #FFA500);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .result-card .my-guess {
+            margin-top: 16px;
+            font-size: 1em;
+            color: #555;
+        }
+
+        .result-card .score-change {
+            margin-top: 10px;
+            font-size: 1.3em;
+            font-weight: 700;
+        }
+
+        .score-change.up { color: #059669; }
+        .score-change.same { color: #888; }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 500;
+            z-index: 1000;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, #6DD5B0, #34D399);
+            color: white;
+        }
+
+        .toast.info {
+            background: linear-gradient(135deg, #B0E0E6, #60A5FA);
+            color: white;
+        }
+
+        .roulette-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            backdrop-filter: blur(4px);
+        }
+
+        .roulette-card {
+            background: white;
+            border-radius: 24px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.5); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .roulette-card h2 {
+            font-size: 1.3em;
+            margin-bottom: 8px;
+            color: #C084FC;
+        }
+
+        .roulette-card .selected-topic {
+            font-size: 1.5em;
+            font-weight: 700;
+            margin: 16px 0;
+            line-height: 1.4;
+        }
+
+        .roulette-viewport {
+            width: 100%;
+            height: 64px;
+            overflow: hidden;
+            position: relative;
+            margin: 20px 0;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.04);
+        }
+
+        .roulette-viewport::before,
+        .roulette-viewport::after {
+            content: '';
+            position: absolute;
+            left: 0; right: 0;
+            height: 20px;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .roulette-viewport::before {
+            top: 0;
+            background: linear-gradient(to bottom, white, transparent);
+        }
+
+        .roulette-viewport::after {
+            bottom: 0;
+            background: linear-gradient(to top, white, transparent);
+        }
+
+        .roulette-pointer {
+            position: absolute;
+            top: 50%;
+            left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #EC4899, #8B5CF6, #6366F1);
+            transform: translateY(-50%);
+            z-index: 3;
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
+        }
+
+        .roulette-pointer::before,
+        .roulette-pointer::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0; height: 0;
+        }
+
+        .roulette-pointer::before {
+            left: 4px;
+            border-top: 6px solid transparent;
+            border-bottom: 6px solid transparent;
+            border-left: 8px solid #8B5CF6;
+        }
+
+        .roulette-pointer::after {
+            right: 4px;
+            border-top: 6px solid transparent;
+            border-bottom: 6px solid transparent;
+            border-right: 8px solid #8B5CF6;
+        }
+
+        .roulette-strip {
+            width: 100%;
+            position: relative;
+            will-change: transform;
+        }
+
+        .roulette-strip-item {
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.05em;
+            font-weight: 600;
+            color: #333;
+            padding: 0 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .roulette-strip-item.highlight {
+            background: linear-gradient(135deg, rgba(236, 72, 153, 0.1), rgba(139, 92, 246, 0.1));
+            border-radius: 8px;
+        }
+        .topic-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 14px;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .topic-card .tc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .topic-card .tc-title {
+            font-size: 1em;
+            font-weight: 700;
+            line-height: 1.4;
+            flex: 1;
+            margin-right: 8px;
+        }
+
+        .topic-card .tc-status {
+            font-size: 0.8em;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .tc-status.pending {
+            background: rgba(245, 158, 11, 0.15);
+            color: #D97706;
+        }
+
+        .tc-status.done {
+            background: rgba(16, 185, 129, 0.15);
+            color: #059669;
+        }
+
+        .topic-card .tc-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .topic-card .tc-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .topic-card .tc-input-group label {
+            font-size: 0.8em;
+            font-weight: 500;
+            color: #888;
+        }
+
+        .topic-card .tc-input-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #E8E8E8;
+            border-radius: 10px;
+            font-size: 0.95em;
+            font-family: 'Noto Sans KR', sans-serif;
+            transition: all 0.3s ease;
+        }
+
+        .topic-card .tc-input-group input:focus {
+            outline: none;
+            border-color: #C084FC;
+            box-shadow: 0 0 0 3px rgba(192, 132, 252, 0.15);
+        }
+
+        .topic-card .tc-input-group input:disabled {
+            background: #f0f0f0;
+            color: #999;
+        }
+
+        .result-item {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border-radius: var(--radius);
+            padding: 18px;
+            margin-bottom: 12px;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .result-item .ri-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            gap: 8px;
+        }
+
+        .result-item .ri-title {
+            font-size: 0.95em;
+            font-weight: 700;
+            flex: 1;
+        }
+
+        .result-item .ri-body {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            text-align: center;
+        }
+
+        .result-item .ri-body.ranked-result-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .result-item .ri-box {
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .result-item .ri-box .ri-label {
+            font-size: 0.75em;
+            color: #888;
+            margin-bottom: 4px;
+        }
+
+        .result-item .ri-box .ri-value {
+            font-size: 1.2em;
+            font-weight: 700;
+        }
+
+        .ri-box.answer { background: rgba(192, 132, 252, 0.15); }
+        .ri-box.answer .ri-value { color: #7C3AED; }
+        .ri-box.mydata { background: rgba(96, 165, 250, 0.15); }
+        .ri-box.mydata .ri-value { color: #2563EB; }
+        .ri-box.guess { background: rgba(255, 182, 193, 0.3); }
+        .ri-box.guess .ri-value { color: #E11D48; }
+        .ri-box.rank { background: rgba(245, 158, 11, 0.15); }
+        .ri-box.rank .ri-value { color: #B45309; }
+        .ri-box.error { background: rgba(16, 185, 129, 0.13); }
+        .ri-box.error .ri-value { color: #047857; }
+        .rank-badge {
+            flex-shrink: 0;
+            padding: 5px 10px;
+            border-radius: 999px;
+            font-size: 0.78em;
+            font-weight: 900;
+            background: #E5E7EB;
+            color: #4B5563;
+        }
+        .rank-badge.top-rank {
+            background: linear-gradient(135deg, #FDE68A, #F59E0B);
+            color: #78350F;
+            box-shadow: 0 0 14px rgba(245, 158, 11, 0.4);
+        }
+        .answer-reveal-overlay { position: fixed; inset: 0; width: 100%; height: 100vh; height: 100dvh; box-sizing: border-box; overflow: hidden; z-index: 180; display: flex; align-items: center; justify-content: center; padding: 20px; background: radial-gradient(circle at 18% 18%, rgba(253,224,71,.38), transparent 30%), radial-gradient(circle at 82% 22%, rgba(244,114,182,.5), transparent 34%), radial-gradient(circle at 50% 90%, rgba(103,232,249,.38), transparent 38%), linear-gradient(135deg, #7C3AED 0%, #3B82F6 48%, #EC4899 100%); color: white; }
+        html.answer-reveal-open, body.answer-reveal-open { overflow: hidden; width: 100%; height: 100%; overscroll-behavior: none; }
+        .student-reveal-stage { width: min(760px, 100%); max-height: 94vh; overflow-y: auto; overflow-x: hidden; padding: 8px; text-align: center; box-sizing: border-box; }
+        .student-reveal-stage { scrollbar-width: none; -ms-overflow-style: none; }
+        .student-reveal-stage::-webkit-scrollbar { display: none; width: 0; height: 0; }
+        .student-reveal-phrase { min-height: 72px; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items: baseline; gap: 10px; }
+        .student-reveal-phrase span { font-size: clamp(1.8rem, 9vw, 4.3rem); font-weight: 1000; letter-spacing: -.05em; }
+        .student-reveal-phrase span:first-child { text-align: right; }
+        .student-reveal-phrase span:last-child { text-align: left; }
+        .student-reveal-type { min-height: 44px; margin-top: 12px; color: #DDD6FE; font-size: clamp(1.1rem, 5vw, 1.8rem); font-weight: 900; }
+        .student-reveal-answer { min-height: 82px; font-size: clamp(3rem, 14vw, 6rem); line-height: 1; font-weight: 1000; color: #FDE68A; text-shadow: 0 0 18px rgba(250,204,21,.75), 0 0 48px rgba(245,158,11,.45); }
+        .student-reveal-rankings { width: 100%; display: grid; gap: 7px; margin: 20px auto 0; box-sizing: border-box; }
+        .student-reveal-row { display: grid; grid-template-columns: minmax(68px,82px) minmax(0,1fr) minmax(0,64px); align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.11); border: 1px solid rgba(255,255,255,.17); text-align: left; animation: studentRevealRank .5s cubic-bezier(.16,1,.3,1) both; box-sizing: border-box; }
+        .student-reveal-row.rank-1 { background: rgba(250,204,21,.28); border-color: rgba(253,224,71,.75); box-shadow: 0 0 25px rgba(250,204,21,.3); }
+        .student-reveal-row .place { font-weight: 1000; text-align: center; }
+        .student-reveal-row .names { min-width: 0; font-size: .9rem; font-weight: 800; line-height: 1.3; }
+        .student-reveal-row .error { color: #E2E8F0; font-size: .7rem; text-align: right; }
+        .student-reveal-row.waiting .names { color: rgba(255,255,255,.5); }
+        .student-reveal-row.revealed .names { animation: studentRevealName .65s cubic-bezier(.18,.89,.32,1.28) both; }
+        .student-reveal-row.suspense { border-color: rgba(253,224,71,.95); animation: studentRankTension .55s ease-in-out infinite alternate; }
+        .student-reveal-row.suspense .names { color: #FEF08A; letter-spacing: .1em; }
+        .student-reveal-group { display: block; padding: 14px 16px; border-radius: 12px; font-weight: 900; text-align: left; animation: studentRevealRank .5s cubic-bezier(.16,1,.3,1) both; }
+        .student-reveal-group-head { display: flex; justify-content: space-between; gap: 12px; }
+        .student-reveal-group-names { margin-top: 8px; color: rgba(255,255,255,.94); font-size: .82rem; line-height: 1.45; font-weight: 700; }
+        .student-reveal-group.incorrect { background: rgba(248,113,113,.15); border: 1px solid rgba(248,113,113,.4); }
+        .student-reveal-group.correct { background: rgba(52,211,153,.2); border: 1px solid rgba(52,211,153,.55); }
+        .student-reveal-status { min-height: 28px; margin-top: 18px; color: #E2E8F0; font-size: .9rem; font-weight: 800; }
+        .student-reveal-pop { animation: studentRevealPop .55s cubic-bezier(.18,.89,.32,1.28) both; }
+        @keyframes studentRevealPop { from { opacity: 0; transform: scale(.5) translateY(18px); filter: blur(7px); } to { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); } }
+        @keyframes studentRevealRank { from { opacity: 0; transform: translateY(24px) scale(.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes studentRevealName { from { opacity: 0; transform: scale(.45); filter: blur(7px); } to { opacity: 1; transform: scale(1); filter: blur(0); } }
+        @keyframes studentRankTension { from { transform: scale(1); box-shadow: 0 0 15px rgba(250,204,21,.25); } to { transform: scale(1.025); box-shadow: 0 0 36px rgba(250,204,21,.65); } }
+    </style>
+</head>
+<body>
+    <div style="position:fixed;top:12px;right:16px;z-index:9999;font-size:0.8em;color:rgba(0,0,0,0.2);font-weight:700;letter-spacing:2px;pointer-events:none;user-select:none;font-family:'Noto Sans KR',sans-serif;">밤티민규 제작</div>
+    <div class="container">
+        <div class="header">
+            <h1>우리반의 대푯값을 찾아라!</h1>
+            <p>친구들의 데이터를 예측하고 점수를 획득하세요!</p>
+        </div>
+
+        <div id="connectionStatus" class="status-bar disconnected">
+            <div class="status-dot"></div>
+            <span>서버 연결 중...</span>
+        </div>
+
+        <!-- 로그인 화면 -->
+        <div id="loginScreen">
+            <div class="card">
+                <div class="card-title">
+                    <span class="icon">LOGIN</span>
+                    학생 로그인
+                </div>
+                <div class="form-group" id="classSelectGroup">
+                    <label>반 선택</label>
+                    <select id="classSelect">
+                        <option value="">반을 선택하세요</option>
+                    </select>
+                    <div id="autoClassName" style="display:none; padding:12px; border:2px solid var(--primary); border-radius:10px; text-align:center; font-weight:700; color:var(--primary); font-size:1.05em;"></div>
+                </div>
+                <div class="form-group">
+                    <label for="studentNumber">번호</label>
+                    <select id="studentNumber">
+                        <option value="">번호를 선택하세요</option>
+                        <option value="1">1번</option>
+                        <option value="2">2번</option>
+                        <option value="3">3번</option>
+                        <option value="4">4번</option>
+                        <option value="5">5번</option>
+                        <option value="6">6번</option>
+                        <option value="7">7번</option>
+                        <option value="8">8번</option>
+                        <option value="9">9번</option>
+                        <option value="10">10번</option>
+                        <option value="11">11번</option>
+                        <option value="12">12번</option>
+                        <option value="13">13번</option>
+                        <option value="14">14번</option>
+                        <option value="15">15번</option>
+                        <option value="16">16번</option>
+                        <option value="17">17번</option>
+                        <option value="18">18번</option>
+                        <option value="19">19번</option>
+                        <option value="20">20번</option>
+                        <option value="21">21번</option>
+                        <option value="22">22번</option>
+                        <option value="23">23번</option>
+                        <option value="24">24번</option>
+                        <option value="25">25번</option>
+                        <option value="26">26번</option>
+                        <option value="27">27번</option>
+                        <option value="28">28번</option>
+                        <option value="29">29번</option>
+                        <option value="30">30번</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>이름</label>
+                    <input type="text" id="studentName" placeholder="이름을 입력하세요" maxlength="10">
+                </div>
+                <button class="btn btn-primary" id="loginBtn" onclick="doLogin()">
+                    <span>GAME START</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 메인 게임 화면 -->
+        <div id="gameScreen" class="hidden">
+            <div class="user-badge">
+                <div class="user-avatar" id="userAvatar"></div>
+                <div class="user-info">
+                    <div class="name" id="userName"></div>
+                    <div class="detail" id="userDetail"></div>
+                </div>
+                <div class="score-badge" id="userScore">0점</div>
+            </div>
+
+            <!-- 룰렛 알림 오버레이 -->
+            <div id="rouletteOverlay" class="roulette-overlay hidden">
+                <div class="roulette-card">
+                    <h2 id="rouletteOverlayTitle">룰렛 실행 중...</h2>
+                    <div class="roulette-viewport" id="rouletteViewport">
+                        <div class="roulette-pointer"></div>
+                        <div class="roulette-strip" id="rouletteStrip"></div>
+                    </div>
+                    <div class="selected-topic hidden" id="rouletteTopicTitle"></div>
+                    <p style="margin-top:12px;font-size:0.9em;color:#888;" id="rouletteOverlayHint"></p>
+                </div>
+            </div>
+
+            <!-- 1단계: 실데이터 입력 -->
+            <div id="realDataSection">
+                <div class="card-title" style="margin-bottom:16px;">
+                    <span class="icon">DATA</span>
+                    나의 실제 데이터 입력
+                </div>
+                <div id="topicCards"></div>
+                <div style="margin-top:20px;">
+                    <button class="btn btn-primary" id="submitAllBtn" onclick="submitAllRealData()">
+                        <span>모두 제출하기</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2단계: 예측 입력 (룰렛 후 활성화) -->
+            <div id="guessSection" class="hidden">
+                <div class="card-title" style="margin-bottom:16px;">
+                    <span class="icon">GUESS</span>
+                    대푯값 예측하기
+                </div>
+                <div id="guessCards"></div>
+                <div style="margin-top:20px;">
+                    <button class="btn btn-success" id="submitGuessAllBtn" onclick="submitAllGuesses()">
+                        <span>예측 모두 제출</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3단계: 대기 -->
+            <div id="roundWaiting" class="hidden">
+                <div class="waiting-animation">
+                    <div class="spinner"></div>
+                    <p>응답이 완료되었습니다!</p>
+                    <p style="font-size:0.85em; color:#bbb; margin-top:8px;">선생님이 정답을 공개할 때까지 기다려주세요</p>
+                </div>
+            </div>
+
+            <!-- 결과 -->
+            <div id="resultSection" class="hidden">
+                <div class="card-title" style="margin-bottom:16px;">
+                    <span class="icon">RESULT</span>
+                    결과 확인
+                </div>
+                <div id="resultCards"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="studentAnswerReveal" class="answer-reveal-overlay hidden" style="display:none;">
+        <div class="student-reveal-stage">
+            <div class="student-reveal-phrase"><span id="studentRevealLead"></span><span id="studentRevealFinish"></span></div>
+            <div id="studentRevealType" class="student-reveal-type"></div>
+            <div id="studentRevealAnswer" class="student-reveal-answer"></div>
+            <div id="studentRevealRankings" class="student-reveal-rankings"></div>
+            <div id="studentRevealStatus" class="student-reveal-status"></div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        const PROD_SERVER_URL = "https://rkdcjfthsrkfkr-production.up.railway.app";
+        const serverOverride = new URLSearchParams(window.location.search).get('server');
+        const isLocalDev = window.location.port === '3001' || window.location.port === '8080';
+        const SERVER_URL = serverOverride
+            || (isLocalDev
+                ? (window.location.port === '3001'
+                    ? window.location.origin
+                    : `${window.location.protocol}//${window.location.hostname}:3001`)
+                : PROD_SERVER_URL);
+
+        const socket = io(SERVER_URL);
+
+        let myClassId = null;
+        let myStuId = null;
+        let selectedClassId = '1-3';
+        let globalTopics = [];
+        let currentClassData = null;
+        let realDataSubmitted = false;
+        let guessableTopicIds = [];
+        let guessedTopicIds = {};
+        let studentScreenInitialized = false;
+        let studentRevealTimers = [];
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const autoClassId = urlParams.get('class');
+
+        const classSelect = document.getElementById('classSelect');
+        const connectionStatus = document.getElementById('connectionStatus');
+
+        if (autoClassId) {
+            selectedClassId = autoClassId;
+            classSelect.value = autoClassId;
+            classSelect.style.display = 'none';
+            document.querySelector('#classSelectGroup label').style.display = 'none';
+            const autoLabel = document.getElementById('autoClassName');
+            autoLabel.textContent = autoClassId.replace('-', '학년 ') + '반';
+            autoLabel.style.display = 'block';
+        }
+
+        function stripUnit(value, topicType) {
+            const sanitized = String(value ?? '').trim();
+            if (!sanitized) return '';
+            if (topicType === '최빈값') return sanitized.toUpperCase();
+
+            const numericMatch = sanitized.match(/[+-]?(?:(?:\d[\d,]*)(?:\.\d+)?|\.\d+)/);
+            if (!numericMatch) return '';
+            const number = Number(numericMatch[0].replace(/,/g, ''));
+            return Number.isFinite(number) ? String(number) : '';
+        }
+
+        socket.on('connect', () => {
+            connectionStatus.className = 'status-bar connected';
+            connectionStatus.querySelector('span').textContent = '서버 연결 완료';
+            if (myClassId) {
+                socket.emit('join_room', { classId: myClassId });
+            }
+        });
+
+        socket.on('disconnect', () => {
+            connectionStatus.className = 'status-bar disconnected';
+            connectionStatus.querySelector('span').textContent = '서버 연결 끊어짐';
+        });
+
+        socket.on('server_error', ({ message }) => {
+            showToast(message || '요청을 처리하지 못했습니다.', 'info');
+        });
+
+        socket.on('init_state', (data) => {
+            globalTopics = data.globalTopics || [];
+            currentClassData = data.classData;
+            selectedClassId = data.selectedClassId || selectedClassId;
+
+            if (data.allClassIds && Array.isArray(data.allClassIds)) {
+                const existingOptions = classSelect.querySelectorAll('option[value]');
+                const existingValues = Array.from(existingOptions).map(o => o.value).filter(v => v);
+                data.allClassIds.forEach(cls => {
+                    if (!existingValues.includes(cls.id)) {
+                        const opt = document.createElement('option');
+                        opt.value = cls.id;
+                        opt.textContent = cls.className;
+                        classSelect.appendChild(opt);
+                    } else {
+                        const opt = classSelect.querySelector(`option[value="${cls.id}"]`);
+                        if (opt) opt.textContent = cls.className;
+                    }
+                });
+                if (!classSelect.value && data.allClassIds.length > 0) {
+                    classSelect.value = selectedClassId;
+                }
+            }
+
+            if (myStuId) syncStudentScreenFromState();
+        });
+
+        socket.on('class_data_update', (classData) => {
+            currentClassData = classData;
+            if (!myStuId) return;
+            const student = classData.students[myStuId];
+            if (student) {
+                document.getElementById('userScore').textContent = student.score + '점';
+                if (!studentScreenInitialized) syncStudentScreenFromState();
+            }
+        });
+
+        socket.on('refresh_global', () => {
+            if (myClassId) {
+                socket.emit('join_room', { classId: myClassId });
+            } else {
+                socket.emit('join_room', { classId: selectedClassId || '1-3' });
+            }
+        });
+
+        socket.on('roulette_spin_start', ({ allTopics, targetTopicId, duration }) => {
+            hideStudentAnswerReveal();
+            guessableTopicIds = [targetTopicId];
+            guessedTopicIds = {};
+            document.getElementById('submitGuessAllBtn').disabled = false;
+            document.getElementById('submitGuessAllBtn').querySelector('span').textContent = '예측 모두 제출';
+            document.getElementById('resultSection').classList.add('hidden');
+            document.getElementById('roundWaiting').classList.add('hidden');
+            const overlay = document.getElementById('rouletteOverlay');
+            const strip = document.getElementById('rouletteStrip');
+            const titleEl = document.getElementById('rouletteOverlayTitle');
+            const hint = document.getElementById('rouletteOverlayHint');
+            const finalTitle = document.getElementById('rouletteTopicTitle');
+
+            titleEl.textContent = '룰렛 실행 중...';
+            hint.textContent = '';
+            finalTitle.classList.add('hidden');
+            overlay.style.display = 'flex';
+            overlay.classList.remove('hidden');
+
+            const ITEM_HEIGHT = 64;
+            const topicCount = allTopics.length;
+            const totalSlots = topicCount * 10;
+            let html = '';
+            for (let r = 0; r < 10; r++) {
+                allTopics.forEach((t, i) => {
+                    const highlight = (r === 9 && t.id === targetTopicId) ? ' highlight' : '';
+                    html += '<div class="roulette-strip-item' + highlight + '">' + t.title + '</div>';
+                });
+            }
+            strip.innerHTML = html;
+
+            const targetIndex = (9 * topicCount) + allTopics.findIndex(t => t.id === targetTopicId);
+            const totalDistance = targetIndex * ITEM_HEIGHT;
+            strip.style.transition = 'none';
+            strip.style.transform = 'translateY(0px)';
+
+            let start = null;
+            const dur = duration || 5000;
+            function animate(ts) {
+                if (!start) start = ts;
+                const elapsed = ts - start;
+                const progress = Math.min(elapsed / dur, 1);
+                const eased = 1 - Math.pow(1 - progress, 4);
+                const y = totalDistance * eased;
+                strip.style.transform = 'translateY(-' + y + 'px)';
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    strip.style.transform = 'translateY(-' + totalDistance + 'px)';
+                    const winner = allTopics.find(t => t.id === targetTopicId);
+                    titleEl.textContent = '이번 주제는?';
+                    finalTitle.classList.remove('hidden');
+                    finalTitle.textContent = winner ? winner.title : '';
+                    hint.textContent = '이제 예측값을 입력하세요!';
+                    setTimeout(() => {
+                        overlay.style.display = 'none';
+                        overlay.classList.add('hidden');
+                        if (realDataSubmitted) {
+                            showGuessSection();
+                        }
+                    }, 2500);
+                }
+            }
+            requestAnimationFrame(animate);
+        });
+
+        socket.on('roulette_start_signal', ({ targetTopicId, classData }) => {
+            currentClassData = classData;
+            guessableTopicIds = [targetTopicId];
+            const student = myStuId ? classData.students[myStuId] : null;
+            const savedGuess = student && student.guessData ? student.guessData[targetTopicId] : '';
+            guessedTopicIds = savedGuess ? { [targetTopicId]: { guess: savedGuess } } : {};
+
+            const overlay = document.getElementById('rouletteOverlay');
+            const overlayVisible = !overlay.classList.contains('hidden') && overlay.style.display !== 'none';
+            if (realDataSubmitted && !overlayVisible) {
+                savedGuess ? showWaitingSection() : showGuessSection();
+            }
+        });
+
+        socket.on('answer_revealed_signal', (classData) => {
+            currentClassData = classData;
+            const student = classData.students[myStuId];
+            if (student) {
+                document.getElementById('userScore').textContent = student.score + '점';
+            }
+            showRankedResults();
+            playStudentAnswerReveal(classData);
+        });
+
+        socket.on('answer_reveal_dismissed', (classData) => {
+            currentClassData = classData;
+            hideStudentAnswerReveal();
+            if (myStuId) showRankedResults();
+        });
+
+        function loadAvailableClasses() {
+            socket.emit('join_room', { classId: selectedClassId || '1-3' });
+        }
+
+        function getTypeClass(type) {
+            if (type === '평균') return 'type-avg';
+            if (type === '중앙값') return 'type-median';
+            if (type === '최빈값') return 'type-mode';
+            return '';
+        }
+
+        function doLogin() {
+            const classId = autoClassId || classSelect.value;
+            const number = document.getElementById('studentNumber').value.trim();
+            const name = document.getElementById('studentName').value.trim();
+
+            if (!classId) { showToast('반을 선택하세요', 'info'); return; }
+            if (!number) { showToast('번호를 선택하세요', 'info'); return; }
+            if (!name) { showToast('이름을 입력하세요', 'info'); return; }
+
+            myClassId = classId;
+            selectedClassId = classId;
+            myStuId = 'id_' + number;
+            studentScreenInitialized = false;
+
+            socket.emit('join_room', { classId });
+            socket.emit('student_login', { classId, number: parseInt(number), name });
+
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('gameScreen').classList.remove('hidden');
+            document.getElementById('userAvatar').textContent = name.charAt(0);
+            document.getElementById('userName').textContent = name;
+            document.getElementById('userDetail').textContent = classId.replace('-', '학년 ') + '반 ' + number + '번';
+            document.getElementById('userScore').textContent = '0점';
+
+            showToast(name + '님 환영합니다!', 'success');
+            setTimeout(() => renderTopicCards(), 500);
+        }
+
+        function hasCompleteRealData(student) {
+            return Boolean(student && globalTopics.length > 0 && globalTopics.every(topic => {
+                const value = student.realData ? student.realData[topic.id] : null;
+                return value !== undefined && value !== null && value !== '';
+            }));
+        }
+
+        function showWaitingSection() {
+            document.getElementById('realDataSection').classList.add('hidden');
+            document.getElementById('guessSection').classList.add('hidden');
+            document.getElementById('resultSection').classList.add('hidden');
+            document.getElementById('roundWaiting').classList.remove('hidden');
+        }
+
+        function syncStudentScreenFromState() {
+            if (!myStuId || !currentClassData) return;
+            const student = currentClassData.students ? currentClassData.students[myStuId] : null;
+            if (!student) return;
+
+            studentScreenInitialized = true;
+            realDataSubmitted = hasCompleteRealData(student);
+            const round = currentClassData.currentRound || {};
+
+            if (round.active && round.topicId) {
+                guessableTopicIds = [round.topicId];
+                const savedGuess = student.guessData ? student.guessData[round.topicId] : '';
+                guessedTopicIds = savedGuess ? { [round.topicId]: { guess: savedGuess } } : {};
+            } else {
+                guessableTopicIds = [];
+                guessedTopicIds = {};
+            }
+
+            if (!realDataSubmitted) {
+                document.getElementById('realDataSection').classList.remove('hidden');
+                document.getElementById('guessSection').classList.add('hidden');
+                document.getElementById('roundWaiting').classList.add('hidden');
+                document.getElementById('resultSection').classList.add('hidden');
+                renderTopicCards();
+                return;
+            }
+
+            if (round.active && round.topicId && round.revealed) {
+                showRankedResults();
+                if (!round.revealDismissed) playStudentAnswerReveal(currentClassData);
+            } else if (round.active && round.topicId) {
+                guessedTopicIds[round.topicId] ? showWaitingSection() : showGuessSection();
+            } else {
+                showWaitingSection();
+            }
+        }
+
+        function renderTopicCards() {
+            const container = document.getElementById('topicCards');
+            if (!globalTopics || globalTopics.length === 0) {
+                container.innerHTML = '<div style="text-align:center;color:#999;padding:30px;">등록된 주제가 없습니다</div>';
+                return;
+            }
+
+            let html = '';
+            globalTopics.forEach(topic => {
+                const hint = (topic.type === '평균' || topic.type === '중앙값')
+                    ? '예: 165cm (숫자만 자동 사용)'
+                    : '영문 소문자도 대문자로 자동 변환';
+
+                html += `
+                    <div class="topic-card" id="card_${topic.id}">
+                        <div class="tc-header">
+                            <div class="tc-title">${topic.title}</div>
+                        </div>
+                        <div class="tc-inputs" style="grid-template-columns:1fr;">
+                            <div class="tc-input-group">
+                                <label>실제 데이터</label>
+                                <input type="text" id="real_${topic.id}" placeholder="${hint}">
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function submitAllRealData() {
+            if (!myClassId || !myStuId) return;
+
+            let allFilled = true;
+            let allRealData = {};
+
+            globalTopics.forEach(topic => {
+                const raw = document.getElementById('real_' + topic.id).value.trim();
+                const normalized = stripUnit(raw, topic.type);
+                if (!normalized) {
+                    allFilled = false;
+                }
+                allRealData[topic.id] = normalized;
+            });
+
+            if (!allFilled) {
+                showToast('모든 주제의 실데이터를 입력하세요', 'info');
+                return;
+            }
+
+            socket.emit('student_submit_realdata', { classId: myClassId, stuId: myStuId, realData: allRealData });
+            realDataSubmitted = true;
+
+            document.getElementById('submitAllBtn').disabled = true;
+            document.getElementById('submitAllBtn').querySelector('span').textContent = '제출 완료!';
+            showToast('실데이터가 모두 제출되었습니다!', 'success');
+
+            document.getElementById('realDataSection').classList.add('hidden');
+
+            if (guessableTopicIds.length > 0) {
+                showGuessSection();
+            } else {
+                document.getElementById('roundWaiting').classList.remove('hidden');
+            }
+        }
+
+        function showGuessSection() {
+            document.getElementById('realDataSection').classList.add('hidden');
+            document.getElementById('roundWaiting').classList.add('hidden');
+            document.getElementById('guessSection').classList.remove('hidden');
+            renderGuessCards();
+        }
+
+        function renderGuessCards() {
+            const container = document.getElementById('guessCards');
+            const guessableTopics = globalTopics.filter(t => guessableTopicIds.includes(t.id));
+
+            if (guessableTopics.length === 0) {
+                container.innerHTML = '<div style="text-align:center;color:#999;padding:30px;">예측 가능한 주제가 없습니다. 교사가 룰렛을 돌릴 때까지 기다려주세요.</div>';
+                return;
+            }
+
+            let html = '';
+            guessableTopics.forEach(topic => {
+                const isGuessed = guessedTopicIds[topic.id];
+                const guessHint = (topic.type === '평균' || topic.type === '중앙값')
+                    ? '예: 165cm (숫자만 자동 사용)'
+                    : '영문 소문자도 대문자로 자동 변환';
+
+                html += `
+                    <div class="topic-card" id="guess_card_${topic.id}">
+                        <div class="tc-header">
+                            <div class="tc-title">${topic.title}</div>
+                            <span class="tc-status ${isGuessed ? 'done' : 'pending'}">${isGuessed ? '예측완료' : '미예측'}</span>
+                        </div>
+                        <div class="tc-inputs" style="grid-template-columns:1fr;">
+                            <div class="tc-input-group">
+                                <label>대푯값 예측</label>
+                                <input type="text" id="guess_${topic.id}" placeholder="${guessHint}" ${isGuessed ? 'disabled' : ''} value="${isGuessed ? (isGuessed.guess || '') : ''}">
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function submitAllGuesses() {
+            if (!myClassId || !myStuId) return;
+
+            let allFilled = true;
+            let allGuessData = {};
+
+            guessableTopicIds.forEach(topicId => {
+                const topic = globalTopics.find(t => t.id === topicId);
+                const raw = document.getElementById('guess_' + topicId).value.trim();
+                const normalized = stripUnit(raw, topic ? topic.type : '평균');
+                if (!normalized) {
+                    allFilled = false;
+                }
+                allGuessData[topicId] = normalized;
+            });
+
+            if (!allFilled) {
+                showToast('예측 가능한 모든 주제에 값을 입력하세요', 'info');
+                return;
+            }
+
+            guessableTopicIds.forEach(topicId => {
+                socket.emit('student_submit_guess', {
+                    classId: myClassId,
+                    stuId: myStuId,
+                    topicId: topicId,
+                    guessValue: allGuessData[topicId]
+                });
+                guessedTopicIds[topicId] = { guess: allGuessData[topicId] };
+            });
+
+            document.getElementById('submitGuessAllBtn').disabled = true;
+            document.getElementById('submitGuessAllBtn').querySelector('span').textContent = '예측 완료!';
+            showToast('예측이 모두 제출되었습니다!', 'success');
+
+            document.getElementById('guessSection').classList.add('hidden');
+            document.getElementById('roundWaiting').classList.remove('hidden');
+        }
+
+        function showAllResults() {
+            document.getElementById('realDataSection').classList.add('hidden');
+            document.getElementById('guessSection').classList.add('hidden');
+            document.getElementById('roundWaiting').classList.add('hidden');
+            document.getElementById('resultSection').classList.remove('hidden');
+
+            if (!currentClassData || !myStuId) return;
+            const student = currentClassData.students[myStuId];
+            if (!student) return;
+
+            const container = document.getElementById('resultCards');
+            let html = '';
+
+            const resultTopics = globalTopics.filter(t => guessableTopicIds.includes(t.id));
+            resultTopics.forEach(topic => {
+                const typeClass = getTypeClass(topic.type);
+                const myReal = student.realData ? (student.realData[topic.id] || '-') : '-';
+                const myGuess = student.guessData ? (student.guessData[topic.id] || '-') : '-';
+                let answer = '-';
+
+                const rawList = Object.values(currentClassData.students)
+                    .map(s => s.realData ? s.realData[topic.id] : null)
+                    .filter(v => v !== undefined && v !== null && v !== '');
+
+                if (rawList.length > 0) {
+                    if (topic.type === '평균') {
+                        const nums = rawList.map(v => parseFloat(stripUnit(v, '평균'))).filter(v => !isNaN(v));
+                        answer = nums.length > 0 ? (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1) : '-';
+                    } else if (topic.type === '중앙값') {
+                        const nums = rawList.map(v => parseFloat(stripUnit(v, '중앙값'))).filter(v => !isNaN(v));
+                        if (nums.length > 0) {
+                            nums.sort((a, b) => a - b);
+                            const mid = Math.floor(nums.length / 2);
+                            answer = nums.length % 2 !== 0 ? nums[mid] : ((nums[mid - 1] + nums[mid]) / 2).toFixed(1);
+                        }
+                    } else if (topic.type === '최빈값') {
+                        const map = {};
+                        let max = 0;
+                        rawList.forEach(v => {
+                            const n = String(v).trim().toUpperCase();
+                            map[n] = (map[n] || 0) + 1;
+                            if (map[n] > max) max = map[n];
+                        });
+                        const modes = Object.keys(map).filter(k => map[k] === max);
+                        answer = modes.join(', ');
+                    }
+                }
+
+                html += `
+                    <div class="result-item">
+                        <div class="ri-header">
+                            <span class="topic-type ${typeClass}" style="margin-right:8px;">${topic.type}</span>
+                            <div class="ri-title">${topic.title}</div>
+                        </div>
+                        <div class="ri-body">
+                            <div class="ri-box mydata">
+                                <div class="ri-label">내 데이터</div>
+                                <div class="ri-value">${myReal}</div>
+                            </div>
+                            <div class="ri-box guess">
+                                <div class="ri-label">내 예측</div>
+                                <div class="ri-value">${myGuess}</div>
+                            </div>
+                            <div class="ri-box answer">
+                                <div class="ri-label">정답 대푯값</div>
+                                <div class="ri-value">${answer}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+
+        }
+
+        function showRankedResults() {
+            document.getElementById('realDataSection').classList.add('hidden');
+            document.getElementById('guessSection').classList.add('hidden');
+            document.getElementById('roundWaiting').classList.add('hidden');
+            document.getElementById('resultSection').classList.remove('hidden');
+
+            if (!currentClassData || !myStuId) return;
+            const student = currentClassData.students[myStuId];
+            if (!student) return;
+
+            const savedResults = currentClassData.results || {};
+            const resultTopics = globalTopics.filter(topic => savedResults[topic.id]);
+            document.getElementById('resultCards').innerHTML = resultTopics.map(topic => {
+                const typeClass = getTypeClass(topic.type);
+                const topicResult = savedResults[topic.id];
+                const myRanking = (topicResult.rankings || []).find(entry => entry.studentId === myStuId);
+                const myReal = student.realData ? (student.realData[topic.id] || '-') : '-';
+                const myGuess = student.guessData ? (student.guessData[topic.id] || '-') : '-';
+                const isModeTopic = topic.type === '최빈값';
+                const isCorrectModeGuess = isModeTopic && myRanking && myRanking.error === 0;
+                const rankLabel = isModeTopic
+                    ? (isCorrectModeGuess ? '정답' : '오답')
+                    : (myRanking && myRanking.rank && myRanking.rank <= 5
+                        ? myRanking.rank + '등'
+                        : '등수 밖');
+                const errorLabel = !myRanking || myRanking.error === null
+                    ? '계산 불가'
+                    : (isModeTopic
+                        ? (myRanking.error === 0 ? '정답 일치' : '불일치')
+                        : formatResultValue(myRanking.error));
+
+                return `
+                    <div class="result-item">
+                        <div class="ri-header">
+                            <span class="topic-type ${typeClass}">${topic.type}</span>
+                            <div class="ri-title">${topic.title}</div>
+                            <span class="rank-badge ${(isCorrectModeGuess || (!isModeTopic && myRanking && myRanking.rank && myRanking.rank <= 5)) ? 'top-rank' : ''}">${rankLabel}</span>
+                        </div>
+                        <div class="ri-body ranked-result-grid">
+                            <div class="ri-box mydata"><div class="ri-label">내 데이터</div><div class="ri-value">${myReal}</div></div>
+                            <div class="ri-box guess"><div class="ri-label">내 예측</div><div class="ri-value">${myGuess}</div></div>
+                            <div class="ri-box answer"><div class="ri-label">정답 대푯값</div><div class="ri-value">${formatResultValue(topicResult.answer)}</div></div>
+                            <div class="ri-box error"><div class="ri-label">${isModeTopic ? '정답 일치 여부' : '정답과의 오차'}</div><div class="ri-value">${errorLabel}</div></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function animateStudentRevealText(element, text) {
+            element.textContent = text;
+            element.classList.remove('student-reveal-pop');
+            void element.offsetWidth;
+            element.classList.add('student-reveal-pop');
+        }
+
+        function scheduleStudentReveal(callback, delay) {
+            studentRevealTimers.push(setTimeout(callback, delay));
+        }
+
+        function hideStudentAnswerReveal() {
+            studentRevealTimers.forEach(timer => clearTimeout(timer));
+            studentRevealTimers = [];
+            const overlay = document.getElementById('studentAnswerReveal');
+            overlay.style.display = 'none';
+            overlay.classList.add('hidden');
+            document.body.classList.remove('answer-reveal-open');
+            document.documentElement.classList.remove('answer-reveal-open');
+        }
+
+        function playStudentAnswerReveal(classData) {
+            const round = classData && classData.currentRound;
+            const topic = round ? globalTopics.find(item => item.id === round.topicId) : null;
+            if (!myStuId || !round || !topic || !round.revealed || round.revealDismissed) return;
+
+            hideStudentAnswerReveal();
+            const overlay = document.getElementById('studentAnswerReveal');
+            const lead = document.getElementById('studentRevealLead');
+            const finish = document.getElementById('studentRevealFinish');
+            const type = document.getElementById('studentRevealType');
+            const answer = document.getElementById('studentRevealAnswer');
+            const rankingContainer = document.getElementById('studentRevealRankings');
+            const status = document.getElementById('studentRevealStatus');
+            lead.textContent = '';
+            finish.textContent = '';
+            type.textContent = '';
+            answer.textContent = '';
+            rankingContainer.innerHTML = '';
+            status.textContent = '';
+            document.body.classList.add('answer-reveal-open');
+            document.documentElement.classList.add('answer-reveal-open');
+            overlay.style.display = 'flex';
+            overlay.classList.remove('hidden');
+
+            animateStudentRevealText(lead, '우리반의…');
+            scheduleStudentReveal(() => animateStudentRevealText(finish, '대푯값은?'), 1300);
+            scheduleStudentReveal(() => animateStudentRevealText(type, topic.type), 2700);
+            scheduleStudentReveal(() => animateStudentRevealText(answer, formatResultValue(round.answer)), 4200);
+
+            const rankings = round.rankings || [];
+            if (topic.type === '최빈값') {
+                const incorrect = rankings.filter(entry => entry.error !== 0);
+                const correct = rankings.filter(entry => entry.error === 0);
+                const formatModeNames = members => members.length > 0
+                    ? members.map(entry => `${entry.name} (${entry.number}번)`).join(', ')
+                    : '해당 학생 없음';
+                scheduleStudentReveal(() => {
+                    rankingContainer.insertAdjacentHTML('beforeend', `<div class="student-reveal-group incorrect"><div class="student-reveal-group-head"><span>❌ 오답</span><span>${incorrect.length}명</span></div><div class="student-reveal-group-names">${formatModeNames(incorrect)}</div></div>`);
+                }, 5600);
+                scheduleStudentReveal(() => {
+                    rankingContainer.insertAdjacentHTML('beforeend', `<div class="student-reveal-group correct"><div class="student-reveal-group-head"><span>✅ 정답</span><span>${correct.length}명</span></div><div class="student-reveal-group-names">${formatModeNames(correct)}</div></div>`);
+                }, 7000);
+                scheduleStudentReveal(() => animateStudentRevealText(status, '선생님이 다음 문제를 시작할 때까지 기다려주세요'), 8200);
+                return;
+            }
+
+            const medals = ['🥇✨', '🥈', '🥉', '🏅', '🎖️'];
+            scheduleStudentReveal(() => {
+                rankingContainer.innerHTML = [1, 2, 3, 4, 5].map(rank => `
+                    <div class="student-reveal-row rank-${rank} waiting" data-student-rank="${rank}">
+                        <div class="place">${medals[rank - 1]} ${rank}등</div>
+                        <div class="names">…</div>
+                        <div class="error"></div>
+                    </div>
+                `).join('');
+            }, 5400);
+
+            const revealStudentRank = rank => {
+                const row = rankingContainer.querySelector(`[data-student-rank="${rank}"]`);
+                if (!row) return;
+                const members = rankings.filter(entry => entry.rank === rank);
+                row.querySelector('.names').textContent = members.length > 0
+                    ? members.map(entry => `${entry.name} (${entry.number}번)`).join(', ')
+                    : '-';
+                row.querySelector('.error').textContent = members.length > 0
+                    ? `오차 ${formatResultValue(members[0].error)}`
+                    : '';
+                row.classList.remove('waiting', 'suspense');
+                row.classList.add('revealed');
+            };
+
+            [5, 4, 3, 2].forEach((rank, index) => {
+                scheduleStudentReveal(() => {
+                    revealStudentRank(rank);
+                }, 6600 + index * 1200);
+            });
+            scheduleStudentReveal(() => {
+                const firstRow = rankingContainer.querySelector('[data-student-rank="1"]');
+                if (firstRow) {
+                    firstRow.classList.add('suspense');
+                    firstRow.querySelector('.names').textContent = '두구두구…';
+                }
+            }, 11400);
+            scheduleStudentReveal(() => revealStudentRank(1), 14000);
+            scheduleStudentReveal(() => animateStudentRevealText(status, '선생님이 다음 문제를 시작할 때까지 기다려주세요'), 15200);
+        }
+
+        function formatResultValue(value) {
+            if (Array.isArray(value)) return value.join(', ');
+            if (typeof value === 'number' && Number.isFinite(value)) return String(Math.round(value * 100) / 100);
+            return value === undefined || value === null || value === '' ? '-' : String(value);
+        }
+
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast ' + type + ' show';
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAvailableClasses();
+        });
+
+        document.getElementById('studentName').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') doLogin();
+        });
+    </script>
+</body>
+</html>

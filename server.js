@@ -10,11 +10,9 @@ app.use(express.json());
 
 const clientDirectory = process.env.CLIENT_DIR
     ? path.resolve(process.env.CLIENT_DIR)
-    : null;
+    : path.join(__dirname, 'public');
 
-if (clientDirectory) {
-    app.use(express.static(clientDirectory));
-}
+app.use(express.static(clientDirectory));
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -32,8 +30,8 @@ let globalTopics = [
 ];
 
 let classes = {
-    '3-1': { className: '3학년 1반', students: {}, currentRound: { active: false, topicId: null, revealed: false, usedIds: [] } },
-    '3-2': { className: '3학년 2반', students: {}, currentRound: { active: false, topicId: null, revealed: false, usedIds: [] } }
+    '1-3': { className: '1학년 3반', students: {}, results: {}, currentRound: { active: false, topicId: null, revealed: false, revealDismissed: true, usedIds: [] } },
+    '1-5': { className: '1학년 5반', students: {}, results: {}, currentRound: { active: false, topicId: null, revealed: false, revealDismissed: true, usedIds: [] } }
 };
 
 const TEACHER_PIN = String(process.env.TEACHER_PIN || '').trim();
@@ -44,6 +42,17 @@ function sanitizeText(value, maxLength) {
         .replace(/[<>&"'`]/g, '')
         .trim()
         .slice(0, maxLength);
+}
+
+function normalizeTopicValue(value, topicType) {
+    const sanitized = sanitizeText(value, 60);
+    if (!sanitized) return '';
+    if (topicType === '최빈값') return sanitized.toUpperCase();
+
+    const numericMatch = sanitized.match(/[+-]?(?:(?:\d[\d,]*)(?:\.\d+)?|\.\d+)/);
+    if (!numericMatch) return '';
+    const number = Number(numericMatch[0].replace(/,/g, ''));
+    return Number.isFinite(number) ? String(number) : '';
 }
 
 function reject(socket, code, message) {
@@ -62,10 +71,32 @@ function sanitizeSubmission(data) {
     const result = {};
     globalTopics.forEach(topic => {
         if (Object.prototype.hasOwnProperty.call(data, topic.id)) {
-            result[topic.id] = sanitizeText(data[topic.id], 60);
+            const normalized = normalizeTopicValue(data[topic.id], topic.type);
+            if (!normalized) return;
+            result[topic.id] = normalized;
         }
     });
-    return result;
+    return Object.keys(result).length === Object.keys(data).length ? result : null;
+}
+
+function randomInteger(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function createDemoValue(topic) {
+    const title = topic.title.toLowerCase();
+    if (topic.type === '최빈값') {
+        const choices = title.includes('mbti')
+            ? ['EN', 'ES', 'IN', 'IS']
+            : ['A', 'B', 'C', 'D'];
+        return choices[randomInteger(0, choices.length - 1)];
+    }
+    if (title.includes('키')) return randomInteger(145, 185);
+    if (title.includes('햄버거')) return randomInteger(1, 8);
+    if (title.includes('유튜브') || title.includes('쇼폼') || title.includes('시청시간')) {
+        return randomInteger(10, 300);
+    }
+    return randomInteger(1, 100);
 }
 
 app.get('/', (req, res) => {
@@ -104,7 +135,7 @@ io.on('connection', (socket) => {
         const className = sanitizeText(payload.className, 30) || classId;
         if (!classId) return reject(socket, 'INVALID_CLASS', '반 이름을 입력하세요.');
         if (!classes[classId]) {
-            classes[classId] = { className, students: {}, currentRound: { active: false, topicId: null, revealed: false, usedIds: [] } };
+            classes[classId] = { className, students: {}, results: {}, currentRound: { active: false, topicId: null, revealed: false, revealDismissed: true, usedIds: [] } };
             io.emit('refresh_global');
         }
     });
@@ -136,6 +167,7 @@ io.on('connection', (socket) => {
         globalTopics = globalTopics.filter(t => t.id !== topicId);
         Object.values(classes).forEach(cls => {
             cls.currentRound.usedIds = cls.currentRound.usedIds.filter(id => id !== topicId);
+            if (cls.results) delete cls.results[topicId];
         });
         io.emit('refresh_global');
     });
@@ -171,11 +203,49 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('seed_demo_data', (payload = {}) => {
+        if (!requireTeacher(socket, payload)) return;
+        const classId = sanitizeText(payload.classId, 30);
+        const currentClass = classes[classId];
+        if (!currentClass) return reject(socket, 'INVALID_CLASS', '존재하지 않는 반입니다.');
+        let addedStudents = 0;
+        let filledValues = 0;
+        for (let number = 1; number <= 30; number += 1) {
+            const stuId = 'id_' + number;
+            if (!currentClass.students[stuId]) {
+                currentClass.students[stuId] = {
+                    id: stuId,
+                    number,
+                    name: `시범학생 ${number}`,
+                    realData: {},
+                    guessData: {},
+                    score: 0
+                };
+                addedStudents += 1;
+            }
+            const student = currentClass.students[stuId];
+            student.realData = student.realData || {};
+            globalTopics.forEach(topic => {
+                if (student.realData[topic.id] === undefined || student.realData[topic.id] === '') {
+                    student.realData[topic.id] = normalizeTopicValue(createDemoValue(topic), topic.type);
+                    filledValues += 1;
+                }
+            });
+        }
+
+        io.to(classId).emit('class_data_update', currentClass);
+        io.emit('refresh_global');
+        socket.emit('demo_data_seeded', { classId, addedStudents, filledValues, totalStudents: Object.keys(currentClass.students).length });
+    });
+
     socket.on('trigger_roulette', (payload = {}) => {
         if (!requireTeacher(socket, payload)) return;
         const classId = sanitizeText(payload.classId, 30);
         const currentClass = classes[classId];
         if (!currentClass) return reject(socket, 'INVALID_CLASS', '존재하지 않는 반입니다.');
+        if (currentClass.currentRound.revealed && !currentClass.currentRound.revealDismissed) {
+            return reject(socket, 'RESULT_NOT_DISMISSED', '먼저 결과 화면에서 다음 문제를 눌러주세요.');
+        }
 
         const availableTopics = globalTopics.filter(t => !currentClass.currentRound.usedIds.includes(t.id));
         if (availableTopics.length === 0) {
@@ -193,7 +263,10 @@ io.on('connection', (socket) => {
         setTimeout(() => {
             currentClass.currentRound.active = true;
             currentClass.currentRound.revealed = false;
+            currentClass.currentRound.revealDismissed = false;
             currentClass.currentRound.topicId = targetTopicId;
+            currentClass.currentRound.answer = null;
+            currentClass.currentRound.rankings = [];
             currentClass.currentRound.usedIds.push(targetTopicId);
             Object.keys(currentClass.students).forEach(sid => {
                 currentClass.students[sid].guessData = currentClass.students[sid].guessData || {};
@@ -207,8 +280,9 @@ io.on('connection', (socket) => {
         const classId = sanitizeText(payload.classId, 30);
         const stuId = sanitizeText(payload.stuId, 20);
         const topicId = sanitizeText(payload.topicId, 64);
-        const guessValue = sanitizeText(payload.guessValue, 60);
         const currentClass = classes[classId];
+        const currentTopic = globalTopics.find(topic => topic.id === topicId);
+        const guessValue = currentTopic ? normalizeTopicValue(payload.guessValue, currentTopic.type) : '';
         if (!currentClass || !currentClass.students[stuId]
             || !currentClass.currentRound.active
             || currentClass.currentRound.topicId !== topicId
@@ -229,32 +303,51 @@ io.on('connection', (socket) => {
         if (!currentClass || !currentClass.currentRound.topicId) {
             return reject(socket, 'NO_ACTIVE_ROUND', '진행 중인 문제가 없습니다.');
         }
+        if (currentClass.currentRound.revealed) {
+            return reject(socket, 'ALREADY_REVEALED', '이미 정답이 공개된 라운드입니다.');
+        }
         currentClass.currentRound.revealed = true;
+        currentClass.currentRound.revealDismissed = false;
         const currentTopic = globalTopics.find(t => t.id === currentClass.currentRound.topicId);
         const answerSheet = calculateServerStats(currentClass.students, currentTopic);
+        currentClass.currentRound.answer = answerSheet.raw;
 
-        if (answerSheet.raw !== null) {
-            const scoreMatchingPool = [];
-            Object.values(currentClass.students).forEach(st => {
-                const userGuess = st.guessData ? st.guessData[currentTopic.id] : null;
-                if (!userGuess) return;
-                let delta = Infinity;
-                if (currentTopic.type === '평균' || currentTopic.type === '중앙값') {
-                    const parsedGuess = parseFloat(stripUnit(userGuess, currentTopic.type));
-                    if (!isNaN(parsedGuess)) delta = Math.abs(answerSheet.raw - parsedGuess);
-                } else if (currentTopic.type === '최빈값') {
-                    delta = answerSheet.raw.includes(String(userGuess).trim().toUpperCase()) ? 0 : 1;
-                }
-                scoreMatchingPool.push({ id: st.id, delta: delta });
-            });
+        Object.values(currentClass.students).forEach(student => {
+            student.guessData = student.guessData || {};
+            const currentGuess = student.guessData[currentTopic.id];
+            const ownValue = student.realData ? student.realData[currentTopic.id] : null;
+            if ((currentGuess === undefined || currentGuess === null || currentGuess === '')
+                && ownValue !== undefined && ownValue !== null && ownValue !== '') {
+                student.guessData[currentTopic.id] = normalizeTopicValue(ownValue, currentTopic.type);
+            }
+        });
 
-            scoreMatchingPool.sort((a, b) => a.delta - b.delta);
-            const trueWinners = scoreMatchingPool.filter(w => w.delta !== Infinity && (currentTopic.type !== '최빈값' || w.delta === 0));
-            if (trueWinners[0]) currentClass.students[trueWinners[0].id].score += 30;
-            if (trueWinners[1]) currentClass.students[trueWinners[1].id].score += 20;
-            if (trueWinners[2]) currentClass.students[trueWinners[2].id].score += 10;
-        }
+        const rankings = answerSheet.raw === null
+            ? []
+            : calculateRankings(currentClass.students, currentTopic, answerSheet.raw);
+        currentClass.currentRound.rankings = rankings;
+        currentClass.results = currentClass.results || {};
+        currentClass.results[currentTopic.id] = { answer: answerSheet.raw, rankings };
+
+        const scoreByRank = { 1: 50, 2: 40, 3: 30, 4: 20, 5: 10 };
+        rankings.forEach(entry => {
+            const earnedScore = currentTopic.type === '최빈값'
+                ? (entry.error === 0 ? 30 : 0)
+                : (scoreByRank[entry.rank] || 0);
+            currentClass.students[entry.studentId].score += earnedScore;
+        });
         io.to(classId).emit('answer_revealed_signal', currentClass);
+    });
+
+    socket.on('dismiss_answer_reveal', (payload = {}) => {
+        if (!requireTeacher(socket, payload)) return;
+        const classId = sanitizeText(payload.classId, 30);
+        const currentClass = classes[classId];
+        if (!currentClass || !currentClass.currentRound.revealed) {
+            return reject(socket, 'INVALID_ROUND', '닫을 수 있는 결과 화면이 없습니다.');
+        }
+        currentClass.currentRound.revealDismissed = true;
+        io.to(classId).emit('answer_reveal_dismissed', currentClass);
     });
 
     socket.on('reset_class', (payload = {}) => {
@@ -262,7 +355,8 @@ io.on('connection', (socket) => {
         const classId = sanitizeText(payload.classId, 30);
         if (classes[classId]) {
             classes[classId].students = {};
-            classes[classId].currentRound = { active: false, topicId: null, revealed: false, usedIds: [] };
+            classes[classId].results = {};
+            classes[classId].currentRound = { active: false, topicId: null, revealed: false, revealDismissed: true, usedIds: [] };
             io.to(classId).emit('refresh_global');
         }
     });
@@ -270,8 +364,8 @@ io.on('connection', (socket) => {
     socket.on('reset_all_server', (payload = {}) => {
         if (!requireTeacher(socket, payload)) return;
         classes = {
-            '3-1': { className: '3학년 1반', students: {}, currentRound: { active: false, topicId: null, revealed: false, usedIds: [] } },
-            '3-2': { className: '3학년 2반', students: {}, currentRound: { active: false, topicId: null, revealed: false, usedIds: [] } }
+            '1-3': { className: '1학년 3반', students: {}, results: {}, currentRound: { active: false, topicId: null, revealed: false, revealDismissed: true, usedIds: [] } },
+            '1-5': { className: '1학년 5반', students: {}, results: {}, currentRound: { active: false, topicId: null, revealed: false, revealDismissed: true, usedIds: [] } }
         };
         io.emit('refresh_global');
     });
@@ -282,8 +376,7 @@ io.on('connection', (socket) => {
 });
 
 function stripUnit(value, topicType) {
-    if (topicType === '최빈값') return value;
-    return String(value).replace(/[^0-9.\-]/g, '');
+    return normalizeTopicValue(value, topicType);
 }
 
 function calculateServerStats(students, topic) {
@@ -309,6 +402,49 @@ function calculateServerStats(students, topic) {
         for (let key in map) { if (map[key] === max) modes.push(key); }
         return { raw: modes };
     }
+}
+
+function calculateRankings(students, topic, answer) {
+    const entries = Object.values(students).map(student => {
+        const guess = student.guessData ? student.guessData[topic.id] : null;
+        let error = null;
+        if (guess !== undefined && guess !== null && guess !== '') {
+            if (topic.type === '평균' || topic.type === '중앙값') {
+                const parsedGuess = parseFloat(stripUnit(guess, topic.type));
+                if (!Number.isNaN(parsedGuess)) error = Math.abs(answer - parsedGuess);
+            } else if (topic.type === '최빈값') {
+                error = answer.includes(String(guess).trim().toUpperCase()) ? 0 : 1;
+            }
+        }
+        return {
+            studentId: student.id,
+            number: student.number,
+            name: student.name,
+            guess,
+            error,
+            rank: null
+        };
+    });
+
+    const rankable = entries
+        .filter(entry => Number.isFinite(entry.error) && (topic.type !== '최빈값' || entry.error === 0))
+        .sort((a, b) => a.error - b.error || a.number - b.number);
+
+    let previousError = null;
+    rankable.forEach((entry, index) => {
+        if (previousError === null || Math.abs(entry.error - previousError) > 1e-9) {
+            entry.rank = index + 1;
+            previousError = entry.error;
+        } else {
+            entry.rank = rankable[index - 1].rank;
+        }
+    });
+
+    return entries.sort((a, b) => {
+        const rankA = a.rank === null ? Infinity : a.rank;
+        const rankB = b.rank === null ? Infinity : b.rank;
+        return rankA - rankB || a.number - b.number;
+    });
 }
 
 const PORT = process.env.PORT || 3000;

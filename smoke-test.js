@@ -74,6 +74,14 @@ test('health endpoint and Socket.IO handshake work', async t => {
     socket.emit('join_room', { classId: '1-3' });
     assert.equal((await initialState).teacherAuthRequired, true);
 
+    const rejectedPin = once(socket, 'teacher_pin_verification');
+    socket.emit('verify_teacher_pin', { teacherPin: 'wrong' });
+    assert.equal((await rejectedPin).valid, false);
+
+    const acceptedPin = once(socket, 'teacher_pin_verification');
+    socket.emit('verify_teacher_pin', { teacherPin: 'test-pin' });
+    assert.equal((await acceptedPin).valid, true);
+
     const unauthorized = once(socket, 'server_error');
     socket.emit('create_class', { classId: 'test-class' });
     assert.equal((await unauthorized).code, 'UNAUTHORIZED');

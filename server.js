@@ -110,6 +110,12 @@ app.get('/health', (req, res) => {
 io.on('connection', (socket) => {
     console.log('🔗 새로운 단말기 연결:', socket.id);
 
+    socket.on('verify_teacher_pin', (payload = {}) => {
+        socket.emit('teacher_pin_verification', {
+            valid: !TEACHER_PIN || String(payload.teacherPin ?? '') === TEACHER_PIN
+        });
+    });
+
     socket.on('join_room', (payload = {}) => {
         const classId = sanitizeText(payload.classId, 30);
         if (!classId) return reject(socket, 'INVALID_CLASS', '올바른 반을 선택하세요.');

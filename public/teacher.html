@@ -1244,6 +1244,8 @@
         let knownClasses = {};
         let teacherAuthRequired = false;
         let teacherPin = sessionStorage.getItem('teacherPin') || '';
+        let teacherAuthenticated = false;
+        let pendingInitState = null;
         let answerRevealTimers = [];
 
         const defaultTopics = [
@@ -1274,8 +1276,48 @@
             showToast(message || '요청을 처리하지 못했습니다.', 'warning');
         });
 
+        function requestTeacherAuthentication() {
+            if (!pendingInitState) return;
+            if (!teacherPin) {
+                const enteredPin = prompt('교사용 PIN을 입력하세요.');
+                if (!enteredPin) {
+                    document.getElementById('connectionBadge').querySelector('span').textContent = 'PIN 입력 필요';
+                    return;
+                }
+                teacherPin = enteredPin.trim();
+            }
+            socket.emit('verify_teacher_pin', { teacherPin });
+        }
+
+        socket.on('teacher_pin_verification', ({ valid }) => {
+            if (!valid) {
+                teacherAuthenticated = false;
+                teacherPin = '';
+                sessionStorage.removeItem('teacherPin');
+                alert('교사용 PIN이 올바르지 않습니다.');
+                requestTeacherAuthentication();
+                return;
+            }
+            teacherAuthenticated = true;
+            sessionStorage.setItem('teacherPin', teacherPin);
+            if (pendingInitState) {
+                const data = pendingInitState;
+                pendingInitState = null;
+                applyInitState(data);
+            }
+        });
+
         socket.on('init_state', (data) => {
             teacherAuthRequired = Boolean(data.teacherAuthRequired);
+            if (teacherAuthRequired && !teacherAuthenticated) {
+                pendingInitState = data;
+                requestTeacherAuthentication();
+                return;
+            }
+            applyInitState(data);
+        });
+
+        function applyInitState(data) {
             globalTopics = data.globalTopics || defaultTopics;
             currentClassData = data.classData;
             selectedClassId = data.selectedClassId || selectedClassId;
@@ -1313,9 +1355,10 @@
 
             renderAll();
             if (round.revealed && !round.revealDismissed) playAnswerRevealAnimation(currentClassData);
-        });
+        }
 
         socket.on('class_data_update', (classData) => {
+            if (teacherAuthRequired && !teacherAuthenticated) return;
             currentClassData = classData;
             usedTopicIds = classData.currentRound.usedIds || [];
             if (selectedClassId) {

@@ -1107,7 +1107,6 @@
                 <h3>현재 라운드</h3>
                 <div class="round-topic" id="roundTopicTitle">-</div>
                 <div class="round-status">
-                    <span id="roundType">-</span>
                     <span id="roundRealCount">실제 데이터: 0명</span>
                     <span id="roundGuessCount">예측: 0명</span>
                 </div>
@@ -1376,6 +1375,10 @@
 
         socket.on('roulette_spin_start', ({ allTopics, targetTopicId, duration }) => {
             hideAnswerReveal();
+            const answerDisplay = document.getElementById('answerDisplay');
+            answerDisplay.style.display = 'none';
+            answerDisplay.classList.add('hidden');
+            document.getElementById('rankingBoard').innerHTML = '';
             const modal = document.getElementById('rouletteModal');
             const titleEl = document.getElementById('rouletteModalTitle');
             const strip = document.getElementById('rouletteStrip');
@@ -1575,6 +1578,10 @@
                 display.style.display = 'none';
                 display.classList.add('hidden');
                 document.getElementById('rouletteBtn').disabled = false;
+                const answerDisplay = document.getElementById('answerDisplay');
+                answerDisplay.style.display = 'none';
+                answerDisplay.classList.add('hidden');
+                document.getElementById('rankingBoard').innerHTML = '';
                 return;
             }
             document.getElementById('rouletteBtn').disabled = Boolean(
@@ -1585,7 +1592,6 @@
             const topicId = currentClassData.currentRound.topicId;
             const topic = globalTopics.find(t => t.id === topicId);
             document.getElementById('roundTopicTitle').textContent = topic ? topic.title : '-';
-            document.getElementById('roundType').textContent = topic ? '유형: ' + topic.type : '-';
 
             const answerDisplay = document.getElementById('answerDisplay');
             const calculatedAnswer = document.getElementById('calculatedAnswer');

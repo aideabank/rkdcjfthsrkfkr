@@ -1,15 +1,18 @@
 const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const test = require('node:test');
 const { io: createClient } = require('socket.io-client');
 
 const PORT = 3100;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 
-async function waitForServer() {
+async function waitForServer(baseUrl = BASE_URL) {
     for (let attempt = 0; attempt < 30; attempt += 1) {
         try {
-            const response = await fetch(`${BASE_URL}/health`);
+            const response = await fetch(`${baseUrl}/health`);
             if (response.ok) return;
         } catch {
             // The child process may still be starting.
@@ -32,7 +35,7 @@ function once(socket, eventName, timeoutMs = 2000) {
 test('health endpoint and Socket.IO handshake work', async t => {
     const child = spawn(process.execPath, ['server.js'], {
         cwd: __dirname,
-        env: { ...process.env, PORT: String(PORT), TEACHER_PIN: 'test-pin' },
+        env: { ...process.env, PORT: String(PORT), TEACHER_PIN: 'test-pin', DISABLE_PERSISTENCE: 'true' },
         stdio: ['ignore', 'pipe', 'pipe']
     });
 
@@ -222,4 +225,104 @@ test('health endpoint and Socket.IO handshake work', async t => {
     const finalDismissed = once(socket, 'answer_reveal_dismissed');
     socket.emit('dismiss_answer_reveal', { classId: 'test-class', teacherPin: 'test-pin' });
     assert.equal((await finalDismissed).currentRound.revealDismissed, true);
+});
+
+test('game state survives a server restart', async t => {
+    const persistencePort = 3101;
+    const persistenceUrl = `http://127.0.0.1:${persistencePort}`;
+    const dataFile = path.join(os.tmpdir(), `stats-game-state-${process.pid}-${Date.now()}.json`);
+    const children = [];
+
+    const spawnPersistentServer = () => {
+        const child = spawn(process.execPath, ['server.js'], {
+            cwd: __dirname,
+            env: {
+                ...process.env,
+                PORT: String(persistencePort),
+                TEACHER_PIN: 'test-pin',
+                DATA_FILE: dataFile,
+                DISABLE_PERSISTENCE: 'false'
+            },
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
+        children.push(child);
+        return child;
+    };
+
+    t.after(async () => {
+        children.forEach(child => {
+            if (!child.killed) child.kill();
+        });
+        await fs.promises.rm(dataFile, { force: true });
+        await fs.promises.rm(dataFile + '.tmp', { force: true });
+    });
+
+    const firstServer = spawnPersistentServer();
+    await waitForServer(persistenceUrl);
+
+    const firstSocket = createClient(persistenceUrl, {
+        transports: ['websocket'],
+        forceNew: true,
+        reconnection: false
+    });
+    await once(firstSocket, 'connect');
+
+    const classCreated = once(firstSocket, 'refresh_global');
+    firstSocket.emit('create_class', {
+        classId: 'saved-class',
+        className: '저장 테스트반',
+        teacherPin: 'test-pin'
+    });
+    await classCreated;
+
+    const joined = once(firstSocket, 'init_state');
+    firstSocket.emit('join_room', { classId: 'saved-class' });
+    await joined;
+
+    const studentUpdated = once(firstSocket, 'class_data_update');
+    firstSocket.emit('student_login', {
+        classId: 'saved-class',
+        number: 7,
+        name: '재시작테스트'
+    });
+    await studentUpdated;
+
+    const topicAdded = once(firstSocket, 'refresh_global');
+    firstSocket.emit('add_global_topic', {
+        title: '재시작 후에도 남는 주제',
+        type: '평균',
+        teacherPin: 'test-pin'
+    });
+    await topicAdded;
+    await new Promise(resolve => setTimeout(resolve, 250));
+    firstSocket.close();
+
+    const firstExited = new Promise(resolve => firstServer.once('exit', resolve));
+    firstServer.kill('SIGTERM');
+    await firstExited;
+
+    const savedFile = JSON.parse(await fs.promises.readFile(dataFile, 'utf8'));
+    assert.equal(savedFile.classes['saved-class'].students.id_7.name, '재시작테스트');
+    assert.ok(savedFile.globalTopics.some(topic => topic.title === '재시작 후에도 남는 주제'));
+
+    const secondServer = spawnPersistentServer();
+    await waitForServer(persistenceUrl);
+    const secondSocket = createClient(persistenceUrl, {
+        transports: ['websocket'],
+        forceNew: true,
+        reconnection: false
+    });
+    t.after(() => secondSocket.close());
+    await once(secondSocket, 'connect');
+
+    const restoredState = once(secondSocket, 'init_state');
+    secondSocket.emit('join_room', { classId: 'saved-class' });
+    const restored = await restoredState;
+    assert.equal(restored.classData.className, '저장 테스트반');
+    assert.equal(restored.classData.students.id_7.name, '재시작테스트');
+    assert.ok(restored.globalTopics.some(topic => topic.title === '재시작 후에도 남는 주제'));
+
+    const secondExited = new Promise(resolve => secondServer.once('exit', resolve));
+    secondServer.kill('SIGTERM');
+    await secondExited;
 });

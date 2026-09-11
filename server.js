@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const { Server } = require('socket.io');
@@ -36,6 +37,61 @@ let classes = {
 
 const TEACHER_PIN = String(process.env.TEACHER_PIN || '').trim();
 const TOPIC_TYPES = new Set(['평균', '중앙값', '최빈값']);
+const PERSISTENCE_DISABLED = String(process.env.DISABLE_PERSISTENCE || '').toLowerCase() === 'true';
+const DATA_FILE = process.env.DATA_FILE
+    ? path.resolve(process.env.DATA_FILE)
+    : path.join(__dirname, 'data', 'game-state.json');
+let persistenceQueue = Promise.resolve();
+
+function getSerializableState() {
+    return { version: 1, globalTopics, classes };
+}
+
+function persistState() {
+    if (PERSISTENCE_DISABLED) return Promise.resolve();
+    const serialized = JSON.stringify(getSerializableState(), null, 2);
+    persistenceQueue = persistenceQueue
+        .catch(() => {})
+        .then(async () => {
+            await fs.promises.mkdir(path.dirname(DATA_FILE), { recursive: true });
+            const temporaryFile = DATA_FILE + '.tmp';
+            await fs.promises.writeFile(temporaryFile, serialized, 'utf8');
+            await fs.promises.rename(temporaryFile, DATA_FILE);
+        })
+        .catch(error => {
+            console.error('❌ 게임 상태 저장 실패:', error.message);
+            throw error;
+        });
+    return persistenceQueue;
+}
+
+async function initializePersistentState() {
+    if (PERSISTENCE_DISABLED) {
+        console.log('ℹ️ 테스트 모드: 영구 저장 비활성화');
+        return;
+    }
+    try {
+        const saved = JSON.parse(await fs.promises.readFile(DATA_FILE, 'utf8'));
+        applySavedState(saved);
+        console.log(`💾 저장된 게임 상태 복원 완료: ${Object.keys(classes).length}개 반`);
+    } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+        await persistState();
+        console.log('💾 초기 게임 상태 저장 완료');
+    }
+}
+
+function applySavedState(saved) {
+    if (!saved || !Array.isArray(saved.globalTopics) || !saved.classes || typeof saved.classes !== 'object') {
+        throw new Error('저장 파일 형식이 올바르지 않습니다.');
+    }
+    globalTopics = saved.globalTopics;
+    classes = saved.classes;
+}
+
+function saveStateSoon() {
+    void persistState().catch(() => {});
+}
 
 function sanitizeText(value, maxLength) {
     return String(value ?? '')
@@ -142,6 +198,7 @@ io.on('connection', (socket) => {
         if (!classId) return reject(socket, 'INVALID_CLASS', '반 이름을 입력하세요.');
         if (!classes[classId]) {
             classes[classId] = { className, students: {}, results: {}, currentRound: { active: false, topicId: null, revealed: false, revealDismissed: true, usedIds: [] } };
+            saveStateSoon();
             io.emit('refresh_global');
         }
     });
@@ -151,6 +208,7 @@ io.on('connection', (socket) => {
         const classId = sanitizeText(payload.classId, 30);
         if (classes[classId]) {
             delete classes[classId];
+            saveStateSoon();
             io.emit('refresh_global');
         }
     });
@@ -164,6 +222,7 @@ io.on('connection', (socket) => {
         }
         const newTopic = { id: 'gt_' + Date.now(), title, type };
         globalTopics.push(newTopic);
+        saveStateSoon();
         io.emit('refresh_global');
     });
 
@@ -175,6 +234,7 @@ io.on('connection', (socket) => {
             cls.currentRound.usedIds = cls.currentRound.usedIds.filter(id => id !== topicId);
             if (cls.results) delete cls.results[topicId];
         });
+        saveStateSoon();
         io.emit('refresh_global');
     });
 
@@ -192,6 +252,7 @@ io.on('connection', (socket) => {
         } else {
             currentClass.students[stuId].name = name;
         }
+        saveStateSoon();
         io.to(classId).emit('class_data_update', currentClass);
     });
 
@@ -205,6 +266,7 @@ io.on('connection', (socket) => {
         }
         if (currentClass && currentClass.students[stuId]) {
             currentClass.students[stuId].realData = realData;
+            saveStateSoon();
             io.to(classId).emit('class_data_update', currentClass);
         }
     });
@@ -239,6 +301,7 @@ io.on('connection', (socket) => {
             });
         }
 
+        saveStateSoon();
         io.to(classId).emit('class_data_update', currentClass);
         io.emit('refresh_global');
         socket.emit('demo_data_seeded', { classId, addedStudents, filledValues, totalStudents: Object.keys(currentClass.students).length });
@@ -278,6 +341,7 @@ io.on('connection', (socket) => {
                 currentClass.students[sid].guessData = currentClass.students[sid].guessData || {};
                 currentClass.students[sid].guessData[targetTopicId] = '';
             });
+            saveStateSoon();
             io.to(classId).emit('roulette_start_signal', { targetTopicId, classData: currentClass });
         }, 5200);
     });
@@ -298,6 +362,7 @@ io.on('connection', (socket) => {
         if (currentClass && currentClass.students[stuId]) {
             currentClass.students[stuId].guessData = currentClass.students[stuId].guessData || {};
             currentClass.students[stuId].guessData[topicId] = guessValue;
+            saveStateSoon();
             io.to(classId).emit('class_data_update', currentClass);
         }
     });
@@ -342,6 +407,7 @@ io.on('connection', (socket) => {
                 : (scoreByRank[entry.rank] || 0);
             currentClass.students[entry.studentId].score += earnedScore;
         });
+        saveStateSoon();
         io.to(classId).emit('answer_revealed_signal', currentClass);
     });
 
@@ -353,6 +419,7 @@ io.on('connection', (socket) => {
             return reject(socket, 'INVALID_ROUND', '닫을 수 있는 결과 화면이 없습니다.');
         }
         currentClass.currentRound.revealDismissed = true;
+        saveStateSoon();
         io.to(classId).emit('answer_reveal_dismissed', currentClass);
     });
 
@@ -363,6 +430,7 @@ io.on('connection', (socket) => {
             classes[classId].students = {};
             classes[classId].results = {};
             classes[classId].currentRound = { active: false, topicId: null, revealed: false, revealDismissed: true, usedIds: [] };
+            saveStateSoon();
             io.to(classId).emit('refresh_global');
         }
     });
@@ -373,6 +441,7 @@ io.on('connection', (socket) => {
             '1-3': { className: '1학년 3반', students: {}, results: {}, currentRound: { active: false, topicId: null, revealed: false, revealDismissed: true, usedIds: [] } },
             '1-5': { className: '1학년 5반', students: {}, results: {}, currentRound: { active: false, topicId: null, revealed: false, revealDismissed: true, usedIds: [] } }
         };
+        saveStateSoon();
         io.emit('refresh_global');
     });
 
@@ -454,6 +523,28 @@ function calculateRankings(students, topic, answer) {
 }
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`🚀 서버가 포트 ${PORT}에서 정상 구동 중입니다!`);
+
+async function startServer() {
+    await initializePersistentState();
+    server.listen(PORT, () => {
+        console.log(`🚀 서버가 포트 ${PORT}에서 정상 구동 중입니다!`);
+    });
+}
+
+async function shutdown(signal) {
+    console.log(`${signal} 수신: 게임 상태를 저장하고 서버를 종료합니다.`);
+    try {
+        await persistenceQueue;
+    } finally {
+        server.close(() => process.exit(0));
+        setTimeout(() => process.exit(0), 5000).unref();
+    }
+}
+
+process.on('SIGTERM', () => { void shutdown('SIGTERM'); });
+process.on('SIGINT', () => { void shutdown('SIGINT'); });
+
+startServer().catch(error => {
+    console.error('❌ 서버 초기화 실패:', error);
+    process.exit(1);
 });

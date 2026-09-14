@@ -550,21 +550,87 @@
         .guide-kind.median { color: #6EE7B7; }
         .guide-kind.mode { color: #FCD34D; }
 
-        .guide-tip {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 14px;
+        .guide-dropzone {
+            min-width: 180px;
+            min-height: 118px;
+            padding: 8px;
+            border: 2px dashed #475569;
+            border-radius: 12px;
+            background: rgba(15, 23, 42, 0.42);
+            transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .guide-tip-card {
-            padding: 20px;
+        .guide-dropzone.drag-over {
+            border-color: var(--primary-light);
+            background: rgba(99, 102, 241, 0.14);
+            box-shadow: inset 0 0 0 2px rgba(129, 140, 248, 0.15);
+        }
+
+        .guide-dropzone.correct { border-color: var(--success); background: rgba(16, 185, 129, 0.12); }
+        .guide-dropzone.incorrect { border-color: var(--danger); background: rgba(239, 68, 68, 0.11); }
+
+        .guide-answer-area {
+            padding: 22px;
             border: 1px solid var(--border);
-            border-radius: 16px;
+            border-radius: 18px;
             background: var(--bg-card);
         }
 
-        .guide-tip-card strong { display: block; margin-bottom: 8px; color: var(--primary-light); }
-        .guide-tip-card span { color: var(--text-secondary); line-height: 1.6; }
+        .guide-answer-head {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .guide-answer-head p { margin-top: 5px; color: var(--text-secondary); font-size: 0.9rem; }
+
+        .guide-answer-bank {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            min-height: 120px;
+            padding: 14px;
+            border: 2px dashed var(--border);
+            border-radius: 14px;
+            background: rgba(15, 23, 42, 0.42);
+        }
+
+        .guide-answer-bank.drag-over { border-color: var(--primary-light); }
+
+        .guide-card {
+            display: flex;
+            align-items: center;
+            min-height: 74px;
+            padding: 12px 14px;
+            border: 1px solid #475569;
+            border-radius: 11px;
+            background: #283548;
+            color: var(--text-primary);
+            line-height: 1.45;
+            cursor: grab;
+            user-select: none;
+            touch-action: manipulation;
+            box-shadow: 0 5px 14px rgba(0, 0, 0, 0.18);
+        }
+
+        .guide-card:active { cursor: grabbing; }
+        .guide-card.dragging { opacity: 0.45; }
+        .guide-card.selected { outline: 3px solid var(--warning); transform: translateY(-2px); }
+        .guide-dropzone .guide-card { min-height: 98px; height: 100%; }
+
+        .guide-quiz-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .guide-quiz-result { margin-right: auto; font-weight: 800; color: var(--text-secondary); }
+        .guide-quiz-button { width: auto; min-width: 120px; padding: 11px 18px; }
 
         .stats-row {
             display: grid;
@@ -1078,7 +1144,8 @@
             .action-area {
                 grid-template-columns: 1fr;
             }
-            .guide-tip { grid-template-columns: 1fr; }
+            .guide-answer-bank { grid-template-columns: 1fr; }
+            .guide-answer-head { align-items: flex-start; flex-direction: column; }
         }
     </style>
 </head>
@@ -1299,7 +1366,7 @@
             <div class="guide-panel">
                 <section class="guide-hero">
                     <h2>언제 어떤 대푯값을 쓸까?</h2>
-                    <p>자료의 종류와 분포를 살펴보고, 자료의 특징을 가장 잘 나타내는 대푯값을 선택해 보세요.</p>
+                    <p>아래의 설명 카드를 알맞은 칸으로 끌어 넣어 표를 완성해 보세요. 태블릿에서는 카드를 누른 뒤 넣을 칸을 눌러도 됩니다.</p>
                 </section>
 
                 <section class="guide-table-card">
@@ -1314,37 +1381,21 @@
                                     <th>예시</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <tr>
-                                    <td class="guide-kind avg">평균</td>
-                                    <td>수치 자료의 모든 값을 골고루 반영하고 싶을 때</td>
-                                    <td>자료 전체의 크기를 하나의 값으로 나타내기 좋다.</td>
-                                    <td>아주 크거나 작은 값인 이상치의 영향을 많이 받는다.</td>
-                                    <td>시험 점수, 키, 하루 평균 공부 시간</td>
-                                </tr>
-                                <tr>
-                                    <td class="guide-kind median">중앙값</td>
-                                    <td>자료가 한쪽으로 치우치거나 이상치가 있을 때</td>
-                                    <td>극단적인 값의 영향을 적게 받아 가운데 수준을 잘 보여준다.</td>
-                                    <td>자료를 크기순으로 정렬해야 하며 모든 값의 차이를 반영하지는 않는다.</td>
-                                    <td>소득, 집값, 영상 시청 시간</td>
-                                </tr>
-                                <tr>
-                                    <td class="guide-kind mode">최빈값</td>
-                                    <td>가장 자주 나타나는 값이나 가장 인기 있는 항목을 찾을 때</td>
-                                    <td>숫자가 아닌 범주형 자료에도 사용할 수 있다.</td>
-                                    <td>최빈값이 여러 개이거나 아예 없을 수도 있다.</td>
-                                    <td>선호 색상, MBTI, 가장 많이 선택한 메뉴</td>
-                                </tr>
-                            </tbody>
+                            <tbody id="guideQuizBody"></tbody>
                         </table>
                     </div>
                 </section>
 
-                <section class="guide-tip" aria-label="대푯값 선택 빠른 기준">
-                    <div class="guide-tip-card"><strong>모든 수치를 반영하려면</strong><span>이상치가 크지 않은지 확인하고 평균을 생각해 보세요.</span></div>
-                    <div class="guide-tip-card"><strong>극단적인 값이 있다면</strong><span>자료를 정렬한 뒤 중앙값이 더 적절한지 살펴보세요.</span></div>
-                    <div class="guide-tip-card"><strong>가장 많은 선택을 찾는다면</strong><span>범주별 빈도를 세어 최빈값을 확인해 보세요.</span></div>
+                <section class="guide-answer-area">
+                    <div class="guide-answer-head">
+                        <div><h3>답안 카드</h3><p>12장의 카드를 표의 빈칸에 하나씩 넣어 보세요.</p></div>
+                    </div>
+                    <div id="guideAnswerBank" class="guide-answer-bank" onclick="returnSelectedGuideCard(event)" ondragover="allowGuideDrop(event)" ondragleave="leaveGuideDrop(event)" ondrop="returnGuideCard(event)"></div>
+                    <div class="guide-quiz-actions">
+                        <div id="guideQuizResult" class="guide-quiz-result">0 / 12칸 배치</div>
+                        <button class="btn btn-reset guide-quiz-button" type="button" onclick="initializeGuideQuiz()">다시 풀기</button>
+                        <button class="btn btn-reveal guide-quiz-button" type="button" onclick="checkGuideQuiz()">정답 확인</button>
+                    </div>
                 </section>
             </div>
         </main>
@@ -1684,6 +1735,154 @@
             renderInputStatusTopicFilter();
             renderInputStatusTable();
             renderStudentTable();
+        }
+
+        const guideQuizRows = [
+            { id: 'avg', label: '평균', className: 'avg' },
+            { id: 'median', label: '중앙값', className: 'median' },
+            { id: 'mode', label: '최빈값', className: 'mode' }
+        ];
+        const guideQuizColumns = ['when', 'strength', 'caution', 'example'];
+        const guideQuizItems = [
+            { id: 'avg-when', row: 'avg', column: 'when', text: '수치 자료의 모든 값을 골고루 반영하고 싶을 때' },
+            { id: 'avg-strength', row: 'avg', column: 'strength', text: '자료 전체의 크기를 하나의 값으로 나타내기 좋다.' },
+            { id: 'avg-caution', row: 'avg', column: 'caution', text: '아주 크거나 작은 값인 이상치의 영향을 많이 받는다.' },
+            { id: 'avg-example', row: 'avg', column: 'example', text: '시험 점수, 키, 하루 평균 공부 시간' },
+            { id: 'median-when', row: 'median', column: 'when', text: '자료가 한쪽으로 치우치거나 이상치가 있을 때' },
+            { id: 'median-strength', row: 'median', column: 'strength', text: '극단적인 값의 영향을 적게 받아 가운데 수준을 잘 보여준다.' },
+            { id: 'median-caution', row: 'median', column: 'caution', text: '자료를 크기순으로 정렬해야 하며 모든 값의 차이를 반영하지는 않는다.' },
+            { id: 'median-example', row: 'median', column: 'example', text: '소득, 집값, 영상 시청 시간' },
+            { id: 'mode-when', row: 'mode', column: 'when', text: '가장 자주 나타나는 값이나 가장 인기 있는 항목을 찾을 때' },
+            { id: 'mode-strength', row: 'mode', column: 'strength', text: '숫자가 아닌 범주형 자료에도 사용할 수 있다.' },
+            { id: 'mode-caution', row: 'mode', column: 'caution', text: '최빈값이 여러 개이거나 아예 없을 수도 있다.' },
+            { id: 'mode-example', row: 'mode', column: 'example', text: '선호 색상, MBTI, 가장 많이 선택한 메뉴' }
+        ];
+        let selectedGuideCardId = null;
+
+        function shuffleGuideItems(items) {
+            const shuffled = [...items];
+            for (let index = shuffled.length - 1; index > 0; index--) {
+                const randomIndex = Math.floor(Math.random() * (index + 1));
+                [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+            }
+            return shuffled;
+        }
+
+        function guideCardMarkup(item) {
+            return `<div class="guide-card" id="guide-card-${item.id}" data-guide-id="${item.id}" draggable="true" role="button" tabindex="0" onclick="selectGuideCard(event, '${item.id}')" onkeydown="handleGuideCardKey(event, '${item.id}')" ondragstart="startGuideDrag(event, '${item.id}')" ondragend="endGuideDrag(event)">${item.text}</div>`;
+        }
+
+        function initializeGuideQuiz() {
+            selectedGuideCardId = null;
+            document.getElementById('guideQuizBody').innerHTML = guideQuizRows.map(row => `
+                <tr>
+                    <td class="guide-kind ${row.className}">${row.label}</td>
+                    ${guideQuizColumns.map(column => `<td><div class="guide-dropzone" data-row="${row.id}" data-column="${column}" onclick="placeSelectedGuideCard(event, this)" ondragover="allowGuideDrop(event)" ondragleave="leaveGuideDrop(event)" ondrop="dropGuideCard(event, this)"></div></td>`).join('')}
+                </tr>
+            `).join('');
+            document.getElementById('guideAnswerBank').innerHTML = shuffleGuideItems(guideQuizItems).map(guideCardMarkup).join('');
+            document.getElementById('guideQuizResult').style.color = '';
+            updateGuideQuizProgress();
+        }
+
+        function startGuideDrag(event, cardId) {
+            selectedGuideCardId = cardId;
+            event.dataTransfer.setData('text/plain', cardId);
+            event.dataTransfer.effectAllowed = 'move';
+            event.currentTarget.classList.add('dragging');
+        }
+
+        function endGuideDrag(event) {
+            event.currentTarget.classList.remove('dragging');
+            document.querySelectorAll('.drag-over').forEach(element => element.classList.remove('drag-over'));
+        }
+
+        function allowGuideDrop(event) {
+            event.preventDefault();
+            event.currentTarget.classList.add('drag-over');
+        }
+
+        function leaveGuideDrop(event) {
+            event.currentTarget.classList.remove('drag-over');
+        }
+
+        function dropGuideCard(event, zone) {
+            event.preventDefault();
+            event.stopPropagation();
+            zone.classList.remove('drag-over');
+            moveGuideCard(event.dataTransfer.getData('text/plain') || selectedGuideCardId, zone);
+        }
+
+        function returnGuideCard(event) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('drag-over');
+            moveGuideCard(event.dataTransfer.getData('text/plain') || selectedGuideCardId, event.currentTarget);
+        }
+
+        function selectGuideCard(event, cardId) {
+            event.stopPropagation();
+            const wasSelected = selectedGuideCardId === cardId;
+            document.querySelectorAll('.guide-card.selected').forEach(card => card.classList.remove('selected'));
+            selectedGuideCardId = wasSelected ? null : cardId;
+            if (!wasSelected) document.getElementById(`guide-card-${cardId}`).classList.add('selected');
+        }
+
+        function handleGuideCardKey(event, cardId) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                selectGuideCard(event, cardId);
+            }
+        }
+
+        function placeSelectedGuideCard(event, zone) {
+            event.stopPropagation();
+            if (selectedGuideCardId) moveGuideCard(selectedGuideCardId, zone);
+        }
+
+        function returnSelectedGuideCard(event) {
+            if (event.target !== event.currentTarget || !selectedGuideCardId) return;
+            moveGuideCard(selectedGuideCardId, event.currentTarget);
+        }
+
+        function moveGuideCard(cardId, target) {
+            if (!cardId) return;
+            const card = document.getElementById(`guide-card-${cardId}`);
+            if (!card) return;
+            if (target.classList.contains('guide-dropzone')) {
+                const occupiedCard = target.querySelector('.guide-card');
+                if (occupiedCard && occupiedCard !== card) document.getElementById('guideAnswerBank').appendChild(occupiedCard);
+            }
+            target.appendChild(card);
+            card.classList.remove('selected', 'dragging');
+            selectedGuideCardId = null;
+            clearGuideQuizEvaluation();
+            updateGuideQuizProgress();
+        }
+
+        function clearGuideQuizEvaluation() {
+            document.querySelectorAll('.guide-dropzone').forEach(zone => zone.classList.remove('correct', 'incorrect'));
+        }
+
+        function updateGuideQuizProgress() {
+            const placed = document.querySelectorAll('.guide-dropzone .guide-card').length;
+            document.getElementById('guideQuizResult').textContent = `${placed} / ${guideQuizItems.length}칸 배치`;
+        }
+
+        function checkGuideQuiz() {
+            let correct = 0;
+            document.querySelectorAll('.guide-dropzone').forEach(zone => {
+                const card = zone.querySelector('.guide-card');
+                const item = card ? guideQuizItems.find(candidate => candidate.id === card.dataset.guideId) : null;
+                const isCorrect = Boolean(item && item.row === zone.dataset.row && item.column === zone.dataset.column);
+                zone.classList.toggle('correct', isCorrect);
+                zone.classList.toggle('incorrect', !isCorrect);
+                if (isCorrect) correct++;
+            });
+            const result = document.getElementById('guideQuizResult');
+            result.textContent = correct === guideQuizItems.length
+                ? `정답입니다! ${correct} / ${guideQuizItems.length}`
+                : `${correct} / ${guideQuizItems.length} 정답 · 다시 옮겨 보세요`;
+            result.style.color = correct === guideQuizItems.length ? 'var(--success)' : 'var(--warning)';
         }
 
         function switchTeacherTab(tabName) {
@@ -2304,6 +2503,8 @@
         document.getElementById('newTopicTitle').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') addTopic();
         });
+
+        initializeGuideQuiz();
     </script>
 </body>
 </html>

@@ -58,7 +58,10 @@ test('health endpoint and Socket.IO handshake work', async t => {
 
     const teacherPageResponse = await fetch(`${BASE_URL}/teacher.html`);
     assert.equal(teacherPageResponse.status, 200);
-    assert.match(await teacherPageResponse.text(), /선생님 대시보드/);
+    const teacherPage = await teacherPageResponse.text();
+    assert.match(teacherPage, /선생님 대시보드/);
+    assert.match(teacherPage, /id="teacherPinInput"[^>]*type="password"/);
+    assert.doesNotMatch(teacherPage, /prompt\('교사용 PIN/);
 
     const rouletteSoundResponse = await fetch(`${BASE_URL}/assets/audio/roulette.wav`);
     assert.equal(rouletteSoundResponse.status, 200);

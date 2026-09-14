@@ -1505,19 +1505,20 @@
             if (detailsOnly) {
                 lead.textContent = '우리반의…';
                 finish.textContent = '대푯값은?';
+                answer.textContent = formatResultValue(round.answer);
             } else {
                 animateStudentRevealText(lead, '우리반의…');
                 scheduleStudentReveal(() => animateStudentRevealText(finish, '대푯값은?'), 1300);
+                scheduleStudentReveal(() => animateStudentRevealText(answer, formatResultValue(round.answer)), 2700);
             }
 
             if (!round.answerDetailsRevealed) {
-                scheduleStudentReveal(() => animateStudentRevealText(status, '선생님이 대푯값을 공개할 때까지 기다려주세요'), 2700);
+                scheduleStudentReveal(() => animateStudentRevealText(status, '선생님이 대푯값 종류를 공개할 때까지 기다려주세요'), 4300);
                 return;
             }
 
-            const detailStart = detailsOnly ? 350 : 2700;
+            const detailStart = detailsOnly ? 350 : 4300;
             scheduleStudentReveal(() => animateStudentRevealText(type, topic.type), detailStart);
-            scheduleStudentReveal(() => animateStudentRevealText(answer, formatResultValue(round.answer)), detailStart + 1500);
 
             const rankings = round.rankings || [];
             if (topic.type === '최빈값') {

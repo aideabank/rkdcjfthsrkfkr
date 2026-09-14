@@ -38,6 +38,59 @@
             display: none !important;
         }
 
+        .pin-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(15, 23, 42, 0.82);
+            backdrop-filter: blur(10px);
+        }
+
+        .pin-card {
+            width: min(420px, 100%);
+            padding: 30px;
+            border: 1px solid rgba(129, 140, 248, 0.4);
+            border-radius: 22px;
+            background: #1E293B;
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+
+        .pin-card h2 { margin-bottom: 8px; font-size: 1.45rem; }
+        .pin-card p { margin-bottom: 20px; color: var(--text-secondary); }
+        .pin-input {
+            width: 100%;
+            padding: 15px 18px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            outline: none;
+            background: #0F172A;
+            color: var(--text-primary);
+            font: inherit;
+            font-size: 1.35rem;
+            letter-spacing: 0.35em;
+            text-align: center;
+        }
+        .pin-input:focus { border-color: var(--primary-light); box-shadow: 0 0 0 4px var(--glow-primary); }
+        .pin-error { min-height: 24px; margin: 10px 0 4px; color: #FCA5A5; font-size: 0.9rem; }
+        .pin-submit {
+            width: 100%;
+            margin-top: 8px;
+            padding: 14px;
+            border: 0;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+            font: inherit;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .pin-submit:disabled { opacity: 0.6; cursor: wait; }
+
         body {
             font-family: 'Noto Sans KR', sans-serif;
             background: var(--bg-dark);
@@ -983,6 +1036,15 @@
 </head>
 <body>
     <audio id="rouletteSound" src="assets/audio/roulette.wav" preload="auto"></audio>
+    <div id="teacherPinModal" class="pin-modal hidden" style="display:none;">
+        <form class="pin-card" onsubmit="submitTeacherPin(event)">
+            <h2>교사용 PIN</h2>
+            <p>교사 화면에 접속하려면 PIN을 입력하세요.</p>
+            <input id="teacherPinInput" class="pin-input" type="password" inputmode="numeric" autocomplete="current-password" aria-label="교사용 PIN" maxlength="32">
+            <div id="teacherPinError" class="pin-error" aria-live="polite"></div>
+            <button id="teacherPinSubmit" class="pin-submit" type="submit">확인</button>
+        </form>
+    </div>
     <div class="dashboard">
         <!-- Header -->
         <header class="header">
@@ -1206,7 +1268,7 @@
             <div id="revealType" class="reveal-type"></div>
             <div id="revealAnswer" class="reveal-answer"></div>
             <div id="revealRankings" class="reveal-rankings"></div>
-            <button id="revealDetailsBtn" class="next-problem-btn hidden" onclick="revealAnswerDetails()">대푯값 공개</button>
+            <button id="revealDetailsBtn" class="next-problem-btn hidden" onclick="revealAnswerDetails()">대푯값 종류 공개</button>
             <button id="nextProblemBtn" class="next-problem-btn hidden" onclick="dismissAnswerReveal()">다음 문제</button>
         </div>
     </div>
@@ -1248,6 +1310,7 @@
         let teacherAuthenticated = false;
         let pendingInitState = null;
         let answerRevealTimers = [];
+        let teacherPinSubmitAction = null;
 
         const defaultTopics = [
             { id: 't_1', title: '우리 반 친구들의 진짜 내 키 (cm)', type: '평균' },
@@ -1278,16 +1341,49 @@
         });
 
         function requestTeacherAuthentication() {
-            if (!pendingInitState) return;
             if (!teacherPin) {
-                const enteredPin = prompt('교사용 PIN을 입력하세요.');
-                if (!enteredPin) {
-                    document.getElementById('connectionBadge').querySelector('span').textContent = 'PIN 입력 필요';
-                    return;
-                }
-                teacherPin = enteredPin.trim();
+                showTeacherPinModal(pin => {
+                    teacherPin = pin;
+                    socket.emit('verify_teacher_pin', { teacherPin });
+                });
+                document.getElementById('connectionBadge').querySelector('span').textContent = 'PIN 입력 필요';
+                return;
             }
             socket.emit('verify_teacher_pin', { teacherPin });
+        }
+
+        function showTeacherPinModal(onSubmit, errorMessage = '') {
+            teacherPinSubmitAction = onSubmit;
+            const modal = document.getElementById('teacherPinModal');
+            const input = document.getElementById('teacherPinInput');
+            document.getElementById('teacherPinError').textContent = errorMessage;
+            document.getElementById('teacherPinSubmit').disabled = false;
+            input.value = '';
+            modal.style.display = 'flex';
+            modal.classList.remove('hidden');
+            setTimeout(() => input.focus(), 0);
+        }
+
+        function hideTeacherPinModal() {
+            const modal = document.getElementById('teacherPinModal');
+            modal.style.display = 'none';
+            modal.classList.add('hidden');
+            document.getElementById('teacherPinInput').value = '';
+            teacherPinSubmitAction = null;
+        }
+
+        function submitTeacherPin(event) {
+            event.preventDefault();
+            const input = document.getElementById('teacherPinInput');
+            const pin = input.value.trim();
+            if (!pin) {
+                document.getElementById('teacherPinError').textContent = 'PIN을 입력하세요.';
+                input.focus();
+                return;
+            }
+            document.getElementById('teacherPinError').textContent = '';
+            document.getElementById('teacherPinSubmit').disabled = true;
+            if (teacherPinSubmitAction) teacherPinSubmitAction(pin);
         }
 
         socket.on('teacher_pin_verification', ({ valid }) => {
@@ -1295,12 +1391,15 @@
                 teacherAuthenticated = false;
                 teacherPin = '';
                 sessionStorage.removeItem('teacherPin');
-                alert('교사용 PIN이 올바르지 않습니다.');
-                requestTeacherAuthentication();
+                showTeacherPinModal(pin => {
+                    teacherPin = pin;
+                    socket.emit('verify_teacher_pin', { teacherPin });
+                }, '교사용 PIN이 올바르지 않습니다.');
                 return;
             }
             teacherAuthenticated = true;
             sessionStorage.setItem('teacherPin', teacherPin);
+            hideTeacherPinModal();
             if (pendingInitState) {
                 const data = pendingInitState;
                 pendingInitState = null;
@@ -1734,22 +1833,23 @@
             if (detailsOnly) {
                 lead.textContent = '우리반의…';
                 finish.textContent = '대푯값은?';
+                answer.textContent = Array.isArray(round.answer) ? round.answer.join(', ') : formatRankingNumber(round.answer);
             } else {
                 revealAnimatedText(lead, '우리반의…');
                 scheduleAnswerReveal(() => revealAnimatedText(finish, '대푯값은?'), 1300);
+                scheduleAnswerReveal(() => {
+                    const answerText = Array.isArray(round.answer) ? round.answer.join(', ') : formatRankingNumber(round.answer);
+                    revealAnimatedText(answer, answerText);
+                }, 2700);
             }
 
             if (!round.answerDetailsRevealed) {
-                scheduleAnswerReveal(() => detailsButton.classList.remove('hidden'), 2700);
+                scheduleAnswerReveal(() => detailsButton.classList.remove('hidden'), 4300);
                 return;
             }
 
-            const detailStart = detailsOnly ? 350 : 2700;
+            const detailStart = detailsOnly ? 350 : 4300;
             scheduleAnswerReveal(() => revealAnimatedText(type, topic.type), detailStart);
-            scheduleAnswerReveal(() => {
-                const answerText = Array.isArray(round.answer) ? round.answer.join(', ') : formatRankingNumber(round.answer);
-                revealAnimatedText(answer, answerText);
-            }, detailStart + 1500);
 
             const rankings = round.rankings || [];
             if (topic.type === '최빈값') {
@@ -1957,10 +2057,8 @@
         function getTeacherAccess() {
             if (!teacherAuthRequired) return {};
             if (!teacherPin) {
-                const enteredPin = prompt('교사용 PIN을 입력하세요.');
-                if (!enteredPin) return null;
-                teacherPin = enteredPin.trim();
-                sessionStorage.setItem('teacherPin', teacherPin);
+                requestTeacherAuthentication();
+                return null;
             }
             return { teacherPin };
         }

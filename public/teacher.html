@@ -492,6 +492,7 @@
 
         .teacher-tabs {
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
             padding: 14px 40px;
             background: #0B1220;
@@ -518,6 +519,52 @@
         .tab-panel { display: none; }
         .main-content.tab-panel.active { display: block; }
         .sidebar.tab-panel.active { display: grid; }
+
+        .guide-panel {
+            display: grid;
+            gap: 22px;
+        }
+
+        .guide-hero {
+            padding: 26px 28px;
+            border: 1px solid rgba(129, 140, 248, 0.35);
+            border-radius: 18px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(59, 130, 246, 0.08));
+        }
+
+        .guide-hero h2 { margin-bottom: 8px; font-size: 1.55rem; }
+        .guide-hero p { color: var(--text-secondary); line-height: 1.7; }
+
+        .guide-table-card {
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            background: var(--bg-card);
+        }
+
+        .guide-table-card table { min-width: 900px; }
+        .guide-table-card th { background: rgba(15, 23, 42, 0.75); }
+        .guide-table-card td { vertical-align: top; line-height: 1.65; }
+        .guide-kind { min-width: 110px; font-size: 1.08rem; font-weight: 900; }
+        .guide-kind.avg { color: #93C5FD; }
+        .guide-kind.median { color: #6EE7B7; }
+        .guide-kind.mode { color: #FCD34D; }
+
+        .guide-tip {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+        }
+
+        .guide-tip-card {
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: var(--bg-card);
+        }
+
+        .guide-tip-card strong { display: block; margin-bottom: 8px; color: var(--primary-light); }
+        .guide-tip-card span { color: var(--text-secondary); line-height: 1.6; }
 
         .stats-row {
             display: grid;
@@ -1031,6 +1078,7 @@
             .action-area {
                 grid-template-columns: 1fr;
             }
+            .guide-tip { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -1049,7 +1097,7 @@
         <!-- Header -->
         <header class="header">
             <div class="header-left">
-                <div class="logo">ST</div>
+                <div class="logo">GY</div>
                 <div class="header-title">
                     <h1 style="display: flex; align-items: center; flex-wrap: wrap; gap: 12px;">
                         <span>우리반의 대푯값을 찾아라!</span>
@@ -1069,6 +1117,7 @@
         <nav class="teacher-tabs" aria-label="교사 화면 메뉴">
             <button class="teacher-tab-button active" data-tab-button="setup" onclick="switchTeacherTab('setup')">수업 준비 · 입력 현황</button>
             <button class="teacher-tab-button" data-tab-button="game" onclick="switchTeacherTab('game')">게임 진행</button>
+            <button class="teacher-tab-button" data-tab-button="guide" onclick="switchTeacherTab('guide')">언제 어떤 대푯값을 쓸까?</button>
         </nav>
 
         <!-- Sidebar -->
@@ -1243,6 +1292,60 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </main>
+
+        <main class="main-content tab-panel" data-tab-panel="guide">
+            <div class="guide-panel">
+                <section class="guide-hero">
+                    <h2>언제 어떤 대푯값을 쓸까?</h2>
+                    <p>자료의 종류와 분포를 살펴보고, 자료의 특징을 가장 잘 나타내는 대푯값을 선택해 보세요.</p>
+                </section>
+
+                <section class="guide-table-card">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>대푯값</th>
+                                    <th>언제 사용하면 좋을까?</th>
+                                    <th>장점</th>
+                                    <th>주의할 점</th>
+                                    <th>예시</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="guide-kind avg">평균</td>
+                                    <td>수치 자료의 모든 값을 골고루 반영하고 싶을 때</td>
+                                    <td>자료 전체의 크기를 하나의 값으로 나타내기 좋다.</td>
+                                    <td>아주 크거나 작은 값인 이상치의 영향을 많이 받는다.</td>
+                                    <td>시험 점수, 키, 하루 평균 공부 시간</td>
+                                </tr>
+                                <tr>
+                                    <td class="guide-kind median">중앙값</td>
+                                    <td>자료가 한쪽으로 치우치거나 이상치가 있을 때</td>
+                                    <td>극단적인 값의 영향을 적게 받아 가운데 수준을 잘 보여준다.</td>
+                                    <td>자료를 크기순으로 정렬해야 하며 모든 값의 차이를 반영하지는 않는다.</td>
+                                    <td>소득, 집값, 영상 시청 시간</td>
+                                </tr>
+                                <tr>
+                                    <td class="guide-kind mode">최빈값</td>
+                                    <td>가장 자주 나타나는 값이나 가장 인기 있는 항목을 찾을 때</td>
+                                    <td>숫자가 아닌 범주형 자료에도 사용할 수 있다.</td>
+                                    <td>최빈값이 여러 개이거나 아예 없을 수도 있다.</td>
+                                    <td>선호 색상, MBTI, 가장 많이 선택한 메뉴</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="guide-tip" aria-label="대푯값 선택 빠른 기준">
+                    <div class="guide-tip-card"><strong>모든 수치를 반영하려면</strong><span>이상치가 크지 않은지 확인하고 평균을 생각해 보세요.</span></div>
+                    <div class="guide-tip-card"><strong>극단적인 값이 있다면</strong><span>자료를 정렬한 뒤 중앙값이 더 적절한지 살펴보세요.</span></div>
+                    <div class="guide-tip-card"><strong>가장 많은 선택을 찾는다면</strong><span>범주별 빈도를 세어 최빈값을 확인해 보세요.</span></div>
+                </section>
             </div>
         </main>
     </div>

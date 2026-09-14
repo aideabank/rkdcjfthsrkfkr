@@ -1112,7 +1112,7 @@
             <div class="sidebar-section input-status-section">
                 <div class="table-header">
                     <h3>학생 실제 데이터 입력 현황</h3>
-                    <div style="font-size:0.85em; color:var(--text-secondary);">주제별 입력값과 미입력 항목을 확인합니다</div>
+                    <div style="font-size:0.85em; color:var(--text-secondary);">전체에서는 입력 개수만, 주제 선택 시 해당 입력값을 확인합니다</div>
                 </div>
                 <div class="input-status-toolbar">
                     <label for="inputStatusTopicFilter">조회 주제</label>
@@ -1127,12 +1127,12 @@
                                 <th>번호</th>
                                 <th>이름</th>
                                 <th>입력 완료</th>
-                                <th id="inputDataHeader">입력 데이터</th>
-                                <th id="inputMissingHeader">미입력 주제</th>
+                                <th id="inputDataHeader" class="hidden">선택 주제 입력값</th>
+                                <th id="inputMissingHeader" class="hidden">입력 상태</th>
                             </tr>
                         </thead>
                         <tbody id="inputStatusTableBody">
-                            <tr><td colspan="5" style="text-align:center; padding:40px; color:var(--text-muted);">학생 접속을 기다리는 중입니다</td></tr>
+                            <tr><td colspan="3" style="text-align:center; padding:40px; color:var(--text-muted);">학생 접속을 기다리는 중입니다</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1936,7 +1936,7 @@
             if (!filter) return;
             const selectedValue = filter.value || 'all';
             filter.innerHTML = '<option value="all">전체 주제</option>' + globalTopics.map(topic => {
-                return `<option value="${topic.id}">${topic.title} (${topic.type})</option>`;
+                return `<option value="${topic.id}">${topic.title}</option>`;
             }).join('');
             filter.value = globalTopics.some(topic => topic.id === selectedValue) ? selectedValue : 'all';
         }
@@ -1948,11 +1948,11 @@
             const filter = document.getElementById('inputStatusTopicFilter');
             const selectedTopicId = filter ? filter.value : 'all';
             const selectedTopic = globalTopics.find(topic => topic.id === selectedTopicId);
-            document.getElementById('inputDataHeader').textContent = selectedTopic ? '선택 주제 입력값' : '입력 데이터';
-            document.getElementById('inputMissingHeader').textContent = selectedTopic ? '입력 상태' : '미입력 주제';
+            document.getElementById('inputDataHeader').classList.toggle('hidden', !selectedTopic);
+            document.getElementById('inputMissingHeader').classList.toggle('hidden', !selectedTopic);
 
             if (students.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--text-muted);">아직 로그인한 학생이 없습니다</td></tr>';
+                tbody.innerHTML = `<tr><td colspan="${selectedTopic ? 5 : 3}" style="text-align:center; padding:40px; color:var(--text-muted);">아직 로그인한 학생이 없습니다</td></tr>`;
                 return;
             }
 
@@ -1963,21 +1963,15 @@
                 const selectedValue = selectedTopic && realData[selectedTopic.id] !== undefined && realData[selectedTopic.id] !== ''
                     ? realData[selectedTopic.id]
                     : '-';
-                const values = selectedTopic
-                    ? selectedValue
-                    : (completedTopics.map(topic => `${topic.type}: ${realData[topic.id]}`).join(' · ') || '-');
-                const selectedComplete = selectedTopic ? selectedValue !== '-' : missingTopics.length === 0;
-                const missing = selectedTopic
-                    ? (selectedComplete ? '입력 완료' : '미입력')
-                    : (missingTopics.map(topic => topic.title).join(', ') || '없음');
+                const selectedComplete = selectedTopic ? selectedValue !== '-' : false;
                 const complete = missingTopics.length === 0;
                 return `
                     <tr>
                         <td><strong>${student.number}</strong></td>
                         <td>${student.name}</td>
                         <td><span class="${complete ? 'status-dot-green' : 'status-dot-gray'}"></span>${completedTopics.length}/${globalTopics.length}</td>
-                        <td>${values}</td>
-                        <td style="color:${selectedTopic ? (selectedComplete ? 'var(--success)' : 'var(--warning)') : (complete ? 'var(--success)' : 'var(--warning)')};">${missing}</td>
+                        ${selectedTopic ? `<td>${selectedValue}</td>` : ''}
+                        ${selectedTopic ? `<td style="color:${selectedComplete ? 'var(--success)' : 'var(--warning)'};">${selectedComplete ? '입력 완료' : '미입력'}</td>` : ''}
                     </tr>
                 `;
             }).join('');

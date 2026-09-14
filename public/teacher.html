@@ -1584,6 +1584,7 @@
 
         function applyInitState(data) {
             globalTopics = data.globalTopics || defaultTopics;
+            syncGuideQuizTopics();
             currentClassData = data.classData;
             selectedClassId = data.selectedClassId || selectedClassId;
             usedTopicIds = data.classData.currentRound.usedIds || [];
@@ -1758,17 +1759,40 @@
             { id: 'avg-when', row: 'avg', column: 'when', text: '수치 자료의 모든 값을 골고루 반영하고 싶을 때' },
             { id: 'avg-strength', row: 'avg', column: 'strength', text: '자료 전체의 크기를 하나의 값으로 나타내기 좋다.' },
             { id: 'avg-caution', row: 'avg', column: 'caution', text: '아주 크거나 작은 값인 이상치의 영향을 많이 받는다.' },
-            { id: 'avg-example', row: 'avg', column: 'example', text: '시험 점수, 키, 하루 평균 공부 시간' },
+            { id: 'avg-example', row: 'avg', column: 'example', text: '' },
             { id: 'median-when', row: 'median', column: 'when', text: '자료가 한쪽으로 치우치거나 이상치가 있을 때' },
             { id: 'median-strength', row: 'median', column: 'strength', text: '자료의 경향성을 잘 보여준다.' },
             { id: 'median-caution', row: 'median', column: 'caution', text: '자료를 크기순으로 정렬해야 한다.' },
-            { id: 'median-example', row: 'median', column: 'example', text: '소득, 집값, 영상 시청 시간' },
+            { id: 'median-example', row: 'median', column: 'example', text: '' },
             { id: 'mode-when', row: 'mode', column: 'when', text: '가장 자주 나타나는 값이나 가장 인기 있는 항목을 찾을 때' },
             { id: 'mode-strength', row: 'mode', column: 'strength', text: '숫자가 아닌 자료에도 사용할 수 있다.' },
             { id: 'mode-caution', row: 'mode', column: 'caution', text: '가장 많이 나타나는 값이 여러 개이거나 아예 없을 수도 있다.' },
-            { id: 'mode-example', row: 'mode', column: 'example', text: '선호 색상, MBTI, 가장 많이 선택한 메뉴' }
+            { id: 'mode-example', row: 'mode', column: 'example', text: '' }
         ];
         let selectedGuideCardId = null;
+        let activeGuideQuizItems = [];
+        let guideQuizTopicSignature = '';
+
+        function buildGuideQuizItems() {
+            const typeByRow = { avg: '평균', median: '중앙값', mode: '최빈값' };
+            return guideQuizItems.map(item => {
+                if (item.column !== 'example') return item;
+                const matchingTopics = globalTopics
+                    .filter(topic => topic.type === typeByRow[item.row])
+                    .map(topic => topic.title);
+                return {
+                    ...item,
+                    text: matchingTopics.length > 0 ? matchingTopics.join(' · ') : '등록된 주제 없음'
+                };
+            });
+        }
+
+        function syncGuideQuizTopics() {
+            const nextSignature = globalTopics.map(topic => `${topic.id}:${topic.title}:${topic.type}`).join('|');
+            if (nextSignature === guideQuizTopicSignature) return;
+            guideQuizTopicSignature = nextSignature;
+            initializeGuideQuiz();
+        }
 
         function shuffleGuideItems(items) {
             const shuffled = [...items];
@@ -1785,13 +1809,14 @@
 
         function initializeGuideQuiz() {
             selectedGuideCardId = null;
+            activeGuideQuizItems = buildGuideQuizItems();
             document.getElementById('guideQuizBody').innerHTML = guideQuizRows.map(row => `
                 <tr>
                     <td class="guide-kind ${row.className}">${row.label}</td>
                     ${guideQuizColumns.map(column => `<td><div class="guide-dropzone" data-row="${row.id}" data-column="${column}" onclick="placeSelectedGuideCard(event, this)" ondragover="allowGuideDrop(event)" ondragleave="leaveGuideDrop(event)" ondrop="dropGuideCard(event, this)"></div></td>`).join('')}
                 </tr>
             `).join('');
-            document.getElementById('guideAnswerBank').innerHTML = shuffleGuideItems(guideQuizItems).map(guideCardMarkup).join('');
+            document.getElementById('guideAnswerBank').innerHTML = shuffleGuideItems(activeGuideQuizItems).map(guideCardMarkup).join('');
             document.getElementById('guideQuizResult').style.color = '';
             updateGuideQuizProgress();
         }
@@ -1876,24 +1901,24 @@
 
         function updateGuideQuizProgress() {
             const placed = document.querySelectorAll('.guide-dropzone .guide-card').length;
-            document.getElementById('guideQuizResult').textContent = `${placed} / ${guideQuizItems.length}칸 배치`;
+            document.getElementById('guideQuizResult').textContent = `${placed} / ${activeGuideQuizItems.length}칸 배치`;
         }
 
         function checkGuideQuiz() {
             let correct = 0;
             document.querySelectorAll('.guide-dropzone').forEach(zone => {
                 const card = zone.querySelector('.guide-card');
-                const item = card ? guideQuizItems.find(candidate => candidate.id === card.dataset.guideId) : null;
+                const item = card ? activeGuideQuizItems.find(candidate => candidate.id === card.dataset.guideId) : null;
                 const isCorrect = Boolean(item && item.row === zone.dataset.row && item.column === zone.dataset.column);
                 zone.classList.toggle('correct', isCorrect);
                 zone.classList.toggle('incorrect', !isCorrect);
                 if (isCorrect) correct++;
             });
             const result = document.getElementById('guideQuizResult');
-            result.textContent = correct === guideQuizItems.length
-                ? `정답입니다! ${correct} / ${guideQuizItems.length}`
-                : `${correct} / ${guideQuizItems.length} 정답 · 다시 옮겨 보세요`;
-            result.style.color = correct === guideQuizItems.length ? 'var(--success)' : 'var(--warning)';
+            result.textContent = correct === activeGuideQuizItems.length
+                ? `정답입니다! ${correct} / ${activeGuideQuizItems.length}`
+                : `${correct} / ${activeGuideQuizItems.length} 정답 · 다시 옮겨 보세요`;
+            result.style.color = correct === activeGuideQuizItems.length ? 'var(--success)' : 'var(--warning)';
         }
 
         function switchTeacherTab(tabName) {

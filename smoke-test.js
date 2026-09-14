@@ -65,6 +65,8 @@ test('health endpoint and Socket.IO handshake work', async t => {
     assert.match(teacherPage, /언제 어떤 대푯값을 쓸까\?/);
     assert.match(teacherPage, /id="guideAnswerBank"/);
     assert.match(teacherPage, /function checkGuideQuiz\(\)/);
+    assert.match(teacherPage, /function buildGuideQuizItems\(\)/);
+    assert.match(teacherPage, /matchingTopics\.join\(' · '\)/);
     assert.match(teacherPage, /draggable="true"/);
     assert.match(teacherPage, /id="teacherPinInput"[^>]*type="password"/);
     assert.doesNotMatch(teacherPage, /prompt\('교사용 PIN/);

@@ -542,18 +542,21 @@
             background: var(--bg-card);
         }
 
-        .guide-table-card table { min-width: 900px; }
-        .guide-table-card th { background: rgba(15, 23, 42, 0.75); }
-        .guide-table-card td { vertical-align: top; line-height: 1.65; }
-        .guide-kind { min-width: 110px; font-size: 1.08rem; font-weight: 900; }
+        .guide-table-card .table-wrapper { overflow-x: visible; }
+        .guide-table-card table { width: 100%; min-width: 0; table-layout: fixed; }
+        .guide-table-card th { padding: 10px 8px; background: rgba(15, 23, 42, 0.75); font-size: 0.82rem; line-height: 1.35; }
+        .guide-table-card th:first-child { width: 9%; }
+        .guide-table-card th:not(:first-child) { width: 22.75%; }
+        .guide-table-card td { padding: 8px; vertical-align: top; line-height: 1.45; }
+        .guide-kind { min-width: 0; font-size: 0.95rem; font-weight: 900; text-align: center; word-break: keep-all; }
         .guide-kind.avg { color: #93C5FD; }
         .guide-kind.median { color: #6EE7B7; }
         .guide-kind.mode { color: #FCD34D; }
 
         .guide-dropzone {
-            min-width: 180px;
-            min-height: 118px;
-            padding: 8px;
+            min-width: 0;
+            min-height: 96px;
+            padding: 6px;
             border: 2px dashed #475569;
             border-radius: 12px;
             background: rgba(15, 23, 42, 0.42);
@@ -602,13 +605,15 @@
         .guide-card {
             display: flex;
             align-items: center;
-            min-height: 74px;
-            padding: 12px 14px;
+            min-height: 64px;
+            padding: 9px 10px;
             border: 1px solid #475569;
             border-radius: 11px;
             background: #283548;
             color: var(--text-primary);
-            line-height: 1.45;
+            font-size: 0.78rem;
+            line-height: 1.38;
+            word-break: keep-all;
             cursor: grab;
             user-select: none;
             touch-action: manipulation;
@@ -618,7 +623,7 @@
         .guide-card:active { cursor: grabbing; }
         .guide-card.dragging { opacity: 0.45; }
         .guide-card.selected { outline: 3px solid var(--warning); transform: translateY(-2px); }
-        .guide-dropzone .guide-card { min-height: 98px; height: 100%; }
+        .guide-dropzone .guide-card { min-height: 82px; height: 100%; }
 
         .guide-quiz-actions {
             display: flex;
@@ -1146,6 +1151,12 @@
             }
             .guide-answer-bank { grid-template-columns: 1fr; }
             .guide-answer-head { align-items: flex-start; flex-direction: column; }
+            .guide-table-card th { padding: 7px 4px; font-size: 0.7rem; }
+            .guide-table-card td { padding: 4px; }
+            .guide-kind { font-size: 0.78rem; }
+            .guide-dropzone { min-height: 82px; padding: 3px; }
+            .guide-dropzone .guide-card { min-height: 74px; }
+            .guide-card { padding: 6px; font-size: 0.7rem; }
         }
     </style>
 </head>
@@ -1749,7 +1760,7 @@
             { id: 'avg-caution', row: 'avg', column: 'caution', text: '아주 크거나 작은 값인 이상치의 영향을 많이 받는다.' },
             { id: 'avg-example', row: 'avg', column: 'example', text: '시험 점수, 키, 하루 평균 공부 시간' },
             { id: 'median-when', row: 'median', column: 'when', text: '자료가 한쪽으로 치우치거나 이상치가 있을 때' },
-            { id: 'median-strength', row: 'median', column: 'strength', text: '극단적인 값의 영향을 적게 받아 가운데 수준을 잘 보여준다.' },
+            { id: 'median-strength', row: 'median', column: 'strength', text: '자료의 경향성을 잘 보여준다.' },
             { id: 'median-caution', row: 'median', column: 'caution', text: '자료를 크기순으로 정렬해야 하며 모든 값의 차이를 반영하지는 않는다.' },
             { id: 'median-example', row: 'median', column: 'example', text: '소득, 집값, 영상 시청 시간' },
             { id: 'mode-when', row: 'mode', column: 'when', text: '가장 자주 나타나는 값이나 가장 인기 있는 항목을 찾을 때' },

@@ -60,6 +60,11 @@ test('health endpoint and Socket.IO handshake work', async t => {
     assert.equal(teacherPageResponse.status, 200);
     assert.match(await teacherPageResponse.text(), /선생님 대시보드/);
 
+    const rouletteSoundResponse = await fetch(`${BASE_URL}/assets/audio/roulette.wav`);
+    assert.equal(rouletteSoundResponse.status, 200);
+    assert.match(rouletteSoundResponse.headers.get('content-type') || '', /audio\/wav/);
+    assert.ok((await rouletteSoundResponse.arrayBuffer()).byteLength > 0);
+
     const socketResponse = await fetch(`${BASE_URL}/socket.io/?EIO=4&transport=polling`);
     assert.equal(socketResponse.status, 200);
     assert.match(await socketResponse.text(), /^0\{"sid":/);
@@ -158,8 +163,9 @@ test('health endpoint and Socket.IO handshake work', async t => {
 
     const revealed = once(socket, 'answer_revealed_signal');
     socket.emit('reveal_answer', { classId: 'test-class', teacherPin: 'test-pin' });
-    const revealedClass = await revealed;
+    let revealedClass = await revealed;
     assert.notEqual(revealedClass.currentRound.answer, null);
+    assert.equal(revealedClass.currentRound.answerDetailsRevealed, false);
     assert.equal(revealedClass.students.id_1.guessData[targetTopicId], normalizedTestGuess);
     assert.equal(revealedClass.students.id_2.guessData[targetTopicId], normalizedTestGuess);
     assert.equal(revealedClass.students.id_3.guessData[targetTopicId], revealedClass.students.id_3.realData[targetTopicId]);
@@ -178,6 +184,15 @@ test('health endpoint and Socket.IO handshake work', async t => {
     const blockedNextRound = once(socket, 'server_error');
     socket.emit('trigger_roulette', { classId: 'test-class', teacherPin: 'test-pin' });
     assert.equal((await blockedNextRound).code, 'RESULT_NOT_DISMISSED');
+
+    const blockedEarlyDismiss = once(socket, 'server_error');
+    socket.emit('dismiss_answer_reveal', { classId: 'test-class', teacherPin: 'test-pin' });
+    assert.equal((await blockedEarlyDismiss).code, 'INVALID_ROUND');
+
+    const detailsRevealed = once(socket, 'answer_details_revealed_signal');
+    socket.emit('reveal_answer_details', { classId: 'test-class', teacherPin: 'test-pin' });
+    revealedClass = await detailsRevealed;
+    assert.equal(revealedClass.currentRound.answerDetailsRevealed, true);
 
     const initialDismissed = once(socket, 'answer_reveal_dismissed');
     socket.emit('dismiss_answer_reveal', { classId: 'test-class', teacherPin: 'test-pin' });
@@ -201,6 +216,9 @@ test('health endpoint and Socket.IO handshake work', async t => {
                 const intermediateReveal = once(socket, 'answer_revealed_signal');
                 socket.emit('reveal_answer', { classId: 'test-class', teacherPin: 'test-pin' });
                 latestClass = await intermediateReveal;
+                const intermediateDetails = once(socket, 'answer_details_revealed_signal');
+                socket.emit('reveal_answer_details', { classId: 'test-class', teacherPin: 'test-pin' });
+                latestClass = await intermediateDetails;
                 const intermediateDismissed = once(socket, 'answer_reveal_dismissed');
                 socket.emit('dismiss_answer_reveal', { classId: 'test-class', teacherPin: 'test-pin' });
                 latestClass = await intermediateDismissed;
@@ -213,6 +231,9 @@ test('health endpoint and Socket.IO handshake work', async t => {
         const modeReveal = once(socket, 'answer_revealed_signal');
         socket.emit('reveal_answer', { classId: 'test-class', teacherPin: 'test-pin' });
         modeClass = await modeReveal;
+        const modeDetails = once(socket, 'answer_details_revealed_signal');
+        socket.emit('reveal_answer_details', { classId: 'test-class', teacherPin: 'test-pin' });
+        modeClass = await modeDetails;
     }
 
     const modeResult = modeClass.results.t_3;

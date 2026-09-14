@@ -982,6 +982,7 @@
     </style>
 </head>
 <body>
+    <audio id="rouletteSound" src="assets/audio/roulette.wav" preload="auto"></audio>
     <div class="dashboard">
         <!-- Header -->
         <header class="header">
@@ -1205,6 +1206,7 @@
             <div id="revealType" class="reveal-type"></div>
             <div id="revealAnswer" class="reveal-answer"></div>
             <div id="revealRankings" class="reveal-rankings"></div>
+            <button id="revealDetailsBtn" class="next-problem-btn hidden" onclick="revealAnswerDetails()">대푯값 공개</button>
             <button id="nextProblemBtn" class="next-problem-btn hidden" onclick="dismissAnswerReveal()">다음 문제</button>
         </div>
     </div>
@@ -1453,6 +1455,11 @@
             playAnswerRevealAnimation(classData);
         });
 
+        socket.on('answer_details_revealed_signal', (classData) => {
+            currentClassData = classData;
+            playAnswerRevealAnimation(classData, true);
+        });
+
         socket.on('answer_reveal_dismissed', (classData) => {
             currentClassData = classData;
             hideAnswerReveal();
@@ -1695,7 +1702,7 @@
             document.documentElement.classList.remove('answer-reveal-open');
         }
 
-        function playAnswerRevealAnimation(classData) {
+        function playAnswerRevealAnimation(classData, detailsOnly = false) {
             const round = classData && classData.currentRound;
             const topic = round ? globalTopics.find(item => item.id === round.topicId) : null;
             if (!round || !topic || !round.revealed || round.revealDismissed) return;
@@ -1707,12 +1714,15 @@
             const type = document.getElementById('revealType');
             const answer = document.getElementById('revealAnswer');
             const rankingContainer = document.getElementById('revealRankings');
+            const detailsButton = document.getElementById('revealDetailsBtn');
             const nextButton = document.getElementById('nextProblemBtn');
             lead.textContent = '';
             finish.textContent = '';
             type.textContent = '';
             answer.textContent = '';
             rankingContainer.innerHTML = '';
+            detailsButton.classList.add('hidden');
+            detailsButton.disabled = false;
             nextButton.classList.add('hidden');
             nextButton.disabled = false;
             document.getElementById('rouletteBtn').disabled = true;
@@ -1721,13 +1731,25 @@
             modal.style.display = 'flex';
             modal.classList.remove('hidden');
 
-            revealAnimatedText(lead, '우리반의…');
-            scheduleAnswerReveal(() => revealAnimatedText(finish, '대푯값은?'), 1300);
-            scheduleAnswerReveal(() => revealAnimatedText(type, topic.type), 2700);
+            if (detailsOnly) {
+                lead.textContent = '우리반의…';
+                finish.textContent = '대푯값은?';
+            } else {
+                revealAnimatedText(lead, '우리반의…');
+                scheduleAnswerReveal(() => revealAnimatedText(finish, '대푯값은?'), 1300);
+            }
+
+            if (!round.answerDetailsRevealed) {
+                scheduleAnswerReveal(() => detailsButton.classList.remove('hidden'), 2700);
+                return;
+            }
+
+            const detailStart = detailsOnly ? 350 : 2700;
+            scheduleAnswerReveal(() => revealAnimatedText(type, topic.type), detailStart);
             scheduleAnswerReveal(() => {
                 const answerText = Array.isArray(round.answer) ? round.answer.join(', ') : formatRankingNumber(round.answer);
                 revealAnimatedText(answer, answerText);
-            }, 4200);
+            }, detailStart + 1500);
 
             const rankings = round.rankings || [];
             if (topic.type === '최빈값') {
@@ -1738,11 +1760,11 @@
                     : '해당 학생 없음';
                 scheduleAnswerReveal(() => {
                     rankingContainer.insertAdjacentHTML('beforeend', `<div class="reveal-group-row incorrect"><div class="reveal-group-head"><span>❌ 오답</span><span>${incorrect.length}명</span></div><div class="reveal-group-names">${formatModeNames(incorrect)}</div></div>`);
-                }, 5600);
+                }, detailStart + 2900);
                 scheduleAnswerReveal(() => {
                     rankingContainer.insertAdjacentHTML('beforeend', `<div class="reveal-group-row correct"><div class="reveal-group-head"><span>✅ 정답</span><span>${correct.length}명</span></div><div class="reveal-group-names">${formatModeNames(correct)}</div></div>`);
-                }, 7000);
-                scheduleAnswerReveal(() => nextButton.classList.remove('hidden'), 8200);
+                }, detailStart + 4300);
+                scheduleAnswerReveal(() => nextButton.classList.remove('hidden'), detailStart + 5500);
                 return;
             }
 
@@ -1755,7 +1777,7 @@
                         <div class="error"></div>
                     </div>
                 `).join('');
-            }, 5400);
+            }, detailStart + 2700);
 
             const revealRank = rank => {
                 const row = rankingContainer.querySelector(`[data-reveal-rank="${rank}"]`);
@@ -1774,7 +1796,7 @@
             [5, 4, 3, 2].forEach((rank, index) => {
                 scheduleAnswerReveal(() => {
                     revealRank(rank);
-                }, 6600 + index * 1200);
+                }, detailStart + 3900 + index * 1200);
             });
             scheduleAnswerReveal(() => {
                 const firstRow = rankingContainer.querySelector('[data-reveal-rank="1"]');
@@ -1782,9 +1804,17 @@
                     firstRow.classList.add('suspense');
                     firstRow.querySelector('.names').textContent = '두구두구…';
                 }
-            }, 11400);
-            scheduleAnswerReveal(() => revealRank(1), 14000);
-            scheduleAnswerReveal(() => nextButton.classList.remove('hidden'), 15200);
+            }, detailStart + 8700);
+            scheduleAnswerReveal(() => revealRank(1), detailStart + 11300);
+            scheduleAnswerReveal(() => nextButton.classList.remove('hidden'), detailStart + 12500);
+        }
+
+        function revealAnswerDetails() {
+            if (!selectedClassId) return;
+            const access = getTeacherAccess();
+            if (!access) return;
+            document.getElementById('revealDetailsBtn').disabled = true;
+            socket.emit('reveal_answer_details', { classId: selectedClassId, ...access });
         }
 
         function dismissAnswerReveal() {
@@ -2020,6 +2050,11 @@
             const access = getTeacherAccess();
             if (!access) return;
 
+            const sound = document.getElementById('rouletteSound');
+            sound.pause();
+            sound.currentTime = 0;
+            sound.play().catch(() => showToast('브라우저에서 룰렛 소리 재생이 차단되었습니다', 'warning'));
+            document.getElementById('rouletteBtn').disabled = true;
             socket.emit('trigger_roulette', { classId: selectedClassId, ...access });
             document.getElementById('revealBtn').disabled = true;
             showToast('룰렛을 실행합니다!', 'info');

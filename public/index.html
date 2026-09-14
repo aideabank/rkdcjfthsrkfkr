@@ -1085,6 +1085,11 @@
             playStudentAnswerReveal(classData);
         });
 
+        socket.on('answer_details_revealed_signal', (classData) => {
+            currentClassData = classData;
+            playStudentAnswerReveal(classData, true);
+        });
+
         socket.on('answer_reveal_dismissed', (classData) => {
             currentClassData = classData;
             hideStudentAnswerReveal();
@@ -1473,7 +1478,7 @@
             document.documentElement.classList.remove('answer-reveal-open');
         }
 
-        function playStudentAnswerReveal(classData) {
+        function playStudentAnswerReveal(classData, detailsOnly = false) {
             const round = classData && classData.currentRound;
             const topic = round ? globalTopics.find(item => item.id === round.topicId) : null;
             if (!myStuId || !round || !topic || !round.revealed || round.revealDismissed) return;
@@ -1497,10 +1502,22 @@
             overlay.style.display = 'flex';
             overlay.classList.remove('hidden');
 
-            animateStudentRevealText(lead, '우리반의…');
-            scheduleStudentReveal(() => animateStudentRevealText(finish, '대푯값은?'), 1300);
-            scheduleStudentReveal(() => animateStudentRevealText(type, topic.type), 2700);
-            scheduleStudentReveal(() => animateStudentRevealText(answer, formatResultValue(round.answer)), 4200);
+            if (detailsOnly) {
+                lead.textContent = '우리반의…';
+                finish.textContent = '대푯값은?';
+            } else {
+                animateStudentRevealText(lead, '우리반의…');
+                scheduleStudentReveal(() => animateStudentRevealText(finish, '대푯값은?'), 1300);
+            }
+
+            if (!round.answerDetailsRevealed) {
+                scheduleStudentReveal(() => animateStudentRevealText(status, '선생님이 대푯값을 공개할 때까지 기다려주세요'), 2700);
+                return;
+            }
+
+            const detailStart = detailsOnly ? 350 : 2700;
+            scheduleStudentReveal(() => animateStudentRevealText(type, topic.type), detailStart);
+            scheduleStudentReveal(() => animateStudentRevealText(answer, formatResultValue(round.answer)), detailStart + 1500);
 
             const rankings = round.rankings || [];
             if (topic.type === '최빈값') {
@@ -1511,11 +1528,11 @@
                     : '해당 학생 없음';
                 scheduleStudentReveal(() => {
                     rankingContainer.insertAdjacentHTML('beforeend', `<div class="student-reveal-group incorrect"><div class="student-reveal-group-head"><span>❌ 오답</span><span>${incorrect.length}명</span></div><div class="student-reveal-group-names">${formatModeNames(incorrect)}</div></div>`);
-                }, 5600);
+                }, detailStart + 2900);
                 scheduleStudentReveal(() => {
                     rankingContainer.insertAdjacentHTML('beforeend', `<div class="student-reveal-group correct"><div class="student-reveal-group-head"><span>✅ 정답</span><span>${correct.length}명</span></div><div class="student-reveal-group-names">${formatModeNames(correct)}</div></div>`);
-                }, 7000);
-                scheduleStudentReveal(() => animateStudentRevealText(status, '선생님이 다음 문제를 시작할 때까지 기다려주세요'), 8200);
+                }, detailStart + 4300);
+                scheduleStudentReveal(() => animateStudentRevealText(status, '선생님이 다음 문제를 시작할 때까지 기다려주세요'), detailStart + 5500);
                 return;
             }
 
@@ -1528,7 +1545,7 @@
                         <div class="error"></div>
                     </div>
                 `).join('');
-            }, 5400);
+            }, detailStart + 2700);
 
             const revealStudentRank = rank => {
                 const row = rankingContainer.querySelector(`[data-student-rank="${rank}"]`);
@@ -1547,7 +1564,7 @@
             [5, 4, 3, 2].forEach((rank, index) => {
                 scheduleStudentReveal(() => {
                     revealStudentRank(rank);
-                }, 6600 + index * 1200);
+                }, detailStart + 3900 + index * 1200);
             });
             scheduleStudentReveal(() => {
                 const firstRow = rankingContainer.querySelector('[data-student-rank="1"]');
@@ -1555,9 +1572,9 @@
                     firstRow.classList.add('suspense');
                     firstRow.querySelector('.names').textContent = '두구두구…';
                 }
-            }, 11400);
-            scheduleStudentReveal(() => revealStudentRank(1), 14000);
-            scheduleStudentReveal(() => animateStudentRevealText(status, '선생님이 다음 문제를 시작할 때까지 기다려주세요'), 15200);
+            }, detailStart + 8700);
+            scheduleStudentReveal(() => revealStudentRank(1), detailStart + 11300);
+            scheduleStudentReveal(() => animateStudentRevealText(status, '선생님이 다음 문제를 시작할 때까지 기다려주세요'), detailStart + 12500);
         }
 
         function formatResultValue(value) {

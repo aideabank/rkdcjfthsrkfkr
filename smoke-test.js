@@ -67,6 +67,7 @@ test('health endpoint and Socket.IO handshake work', async t => {
     assert.match(teacherPage, /function checkGuideQuiz\(\)/);
     assert.match(teacherPage, /function buildGuideQuizItems\(\)/);
     assert.match(teacherPage, /matchingTopics\.join\(' · '\)/);
+    assert.match(teacherPage, /replace\(\/\\s\*\\\(\[\^\)\]\*\\\)\/g, ''\)/);
     assert.match(teacherPage, /draggable="true"/);
     assert.match(teacherPage, /id="teacherPinInput"[^>]*type="password"/);
     assert.doesNotMatch(teacherPage, /prompt\('교사용 PIN/);
